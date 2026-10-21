@@ -1,0 +1,24 @@
+{
+  "name": "@openfolio/embed",
+  "version": "0.1.0",
+  "description": "One-line embed for an Openfolio persona: 3D face, voice and chat.",
+  "scripts": {
+    "build": "vite build -c vite.app.config.ts && vite build -c vite.loader.config.ts",
+    "typecheck": "tsc",
+    "dev": "vite build -c vite.app.config.ts --watch"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@met4citizen/headaudio": "^0.1.0",
+    "@met4citizen/talkinghead": "^1.7.0",
+    "@pipecat-ai/client-js": "^1.14.0",
+    "@pipecat-ai/small-webrtc-transport": "^1.11.0",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  },
+  "private": true,
+  "type": "module"
+}

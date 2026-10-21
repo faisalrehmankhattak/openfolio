@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Openfolio demo</title>
+  <style>
+    body { margin: 0; font: 16px/1.6 ui-sans-serif, system-ui, sans-serif; color: #14161a; background: #fafafa; }
+    main { max-width: 720px; margin: 0 auto; padding: 64px 24px; }
+    h1 { font-size: 40px; line-height: 1.1; margin: 0 0 12px; }
+    code { background: #eef0f3; padding: 2px 6px; border-radius: 6px; font-size: 14px; }
+    pre { background: #14161a; color: #e6e6e6; padding: 16px; border-radius: 12px; overflow: auto; font-size: 13px; }
+    .note { color: #5d6470; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Any portfolio, now with a face and a voice.</h1>
+    <p>This stands in for your site. The bubble in the corner comes from one line:</p>
+    <pre>&lt;script src="http://127.0.0.1:7860/embed/embed.js" data-persona="faisal" async&gt;&lt;/script&gt;</pre>
+    <p>Or place it inside a layout with <code>&lt;openfolio-agent persona="faisal" mode="inline"&gt;</code>.</p>
+    <p class="note">The face is a placeholder (a CC0 MakeHuman model) until a head is built from the owner's selfie.</p>
+  </main>
+  <script src="/embed/embed.js" data-persona="faisal" data-label="Talk to Faisal" async></script>
+</body>
+</html>
