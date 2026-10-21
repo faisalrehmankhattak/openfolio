@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,6 +28,7 @@ class Settings:
     tts_provider: str  # elevenlabs | kokoro
     llm_base_url: str | None
     llm_model: str
+    llm_reasoning_effort: str  # "auto", "off", or a value such as "none" / "low"
 
     deepgram_api_key: str | None
     llm_api_key: str | None
@@ -53,6 +55,24 @@ class Settings:
         return problems
 
 
+def llm_extra_params(s: Settings) -> dict:
+    """Extra request fields for the LLM.
+
+    OpenAI's newer reasoning models (gpt-5.x, gpt-6) refuse function tools on
+    /v1/chat/completions unless reasoning_effort is "none". A voice persona
+    wants fast answers anyway, so "auto" sends "none" to those models.
+    """
+    effort = s.llm_reasoning_effort
+    if effort in ("", "off"):
+        return {}
+    if effort == "auto":
+        is_openai = not s.llm_base_url or "api.openai.com" in s.llm_base_url
+        if is_openai and re.match(r"^gpt-(5\.\d|6)", s.llm_model):
+            return {"reasoning_effort": "none"}
+        return {}
+    return {"reasoning_effort": effort}
+
+
 def load_settings() -> Settings:
     load_dotenv(ROOT / ".env")
     ice = json.loads(os.getenv("ICE_SERVERS", '[{"urls": "stun:stun.l.google.com:19302"}]'))
@@ -65,6 +85,7 @@ def load_settings() -> Settings:
         tts_provider=os.getenv("TTS_PROVIDER", "kokoro"),
         llm_base_url=os.getenv("LLM_BASE_URL") or None,
         llm_model=os.getenv("LLM_MODEL", ""),
+        llm_reasoning_effort=os.getenv("LLM_REASONING_EFFORT", "auto").strip().lower(),
         deepgram_api_key=os.getenv("DEEPGRAM_API_KEY"),
         llm_api_key=os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY"),
         elevenlabs_api_key=os.getenv("ELEVENLABS_API_KEY"),

@@ -22,3 +22,17 @@ def test_prompt_carries_rules_and_facts():
 def test_public_view_hides_prompt_material():
     view = load_personas(PERSONAS)["faisal"].public_view()
     assert set(view) == {"id", "name", "first_name", "title", "tagline", "avatar", "quick_questions"}
+
+
+def test_reasoning_effort_auto():
+    from dataclasses import replace
+
+    from openfolio_worker.config import llm_extra_params, load_settings
+
+    s = load_settings()
+    assert llm_extra_params(replace(s, llm_model="gpt-6-luna", llm_base_url=None, llm_reasoning_effort="auto")) == {"reasoning_effort": "none"}
+    assert llm_extra_params(replace(s, llm_model="gpt-5.6", llm_base_url=None, llm_reasoning_effort="auto")) == {"reasoning_effort": "none"}
+    assert llm_extra_params(replace(s, llm_model="gpt-4.1-mini", llm_base_url=None, llm_reasoning_effort="auto")) == {}
+    assert llm_extra_params(replace(s, llm_model="gpt-6-luna", llm_base_url="https://api.groq.com/openai/v1", llm_reasoning_effort="auto")) == {}
+    assert llm_extra_params(replace(s, llm_model="x", llm_reasoning_effort="off")) == {}
+    assert llm_extra_params(replace(s, llm_model="x", llm_reasoning_effort="low")) == {"reasoning_effort": "low"}

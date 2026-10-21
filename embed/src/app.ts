@@ -318,7 +318,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
             const serious = e?.data?.fatal || /completion|model|api key|auth|quota|rate limit|denied|invalid/i.test(raw);
             if (showDetails) logLine(`Error: ${detail}`, "note");
             if (!serious) return;
-            showHint(showDetails ? `Server error: ${detail.slice(0, 220)}` : "Something went wrong on our side. Try again in a moment.", "error");
+            showHint(showDetails ? `Server error: ${detail.slice(0, 420)}` : "Something went wrong on our side. Try again in a moment.", "error");
           },
           onDisconnected: () => {
             teardown();

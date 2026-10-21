@@ -26,7 +26,7 @@ from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
-from .config import Settings
+from .config import Settings, llm_extra_params
 from .persona import Persona, build_system_prompt
 from .tools import ALL_TOOLS, SessionResources
 
@@ -103,6 +103,7 @@ def make_llm(s: Settings, persona: Persona) -> OpenAILLMService:
         settings=OpenAILLMService.Settings(
             model=s.llm_model,
             system_instruction=build_system_prompt(persona),
+            extra=llm_extra_params(s),
         ),
     )
 

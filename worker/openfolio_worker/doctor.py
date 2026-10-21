@@ -12,7 +12,7 @@ import time
 import httpx
 from loguru import logger
 
-from .config import Settings, load_settings
+from .config import Settings, llm_extra_params, load_settings
 
 
 async def check_llm(s: Settings) -> str:
@@ -20,14 +20,18 @@ async def check_llm(s: Settings) -> str:
 
     client = AsyncOpenAI(api_key=s.llm_api_key or "not-needed", base_url=s.llm_base_url, timeout=20)
     t0 = time.monotonic()
-    # Same shape as a real call: streaming, with a developer message.
+    # Same shape as a real call: streaming, a developer message, a tool and the
+    # same extra fields, so anything a real call would hit fails here first.
     stream = await client.chat.completions.create(
         model=s.llm_model,
         messages=[
-            {"role": "developer", "content": "Reply with the single word OK."},
+            {"role": "developer", "content": "Reply with the single word OK. Do not call any tool."},
             {"role": "user", "content": "ping"},
         ],
+        tools=[{"type": "function", "function": {"name": "show_projects", "description": "Show projects.",
+                                                 "parameters": {"type": "object", "properties": {}, "required": []}}}],
         stream=True,
+        **llm_extra_params(s),
     )
     text = ""
     first = None
@@ -37,7 +41,9 @@ async def check_llm(s: Settings) -> str:
             text += chunk.choices[0].delta.content
     if not text.strip():
         raise RuntimeError("the model answered with no text")
-    return f"{s.llm_model} answered in {first:.2f}s"
+    extra = llm_extra_params(s)
+    note = f" (reasoning_effort={extra['reasoning_effort']})" if extra else ""
+    return f"{s.llm_model}{note} answered in {first:.2f}s"
 
 
 async def check_deepgram(s: Settings) -> str:
