@@ -25,7 +25,7 @@ The current face is a **placeholder**: a CC0 MakeHuman model from the TalkingHea
 
 ## Run it on your Mac
 
-You need [uv](https://docs.astral.sh/uv/) and Node.js 18+.
+You need [uv](https://docs.astral.sh/uv/) and Node.js 22.12+ (only to rebuild the widget; the server itself needs no Node).
 
 ```sh
 cp .env.example .env        # then add your keys (see below)
