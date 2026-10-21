@@ -16,7 +16,12 @@ from loguru import logger
 from pipecat.processors.frameworks.rtvi.frames import RTVIServerMessageFrame
 from pipecat.services.llm_service import FunctionCallParams
 
+import re
+
+from .guard import clean
 from .persona import Persona
+
+EMAIL = re.compile(r"[^@\s]{1,64}@[^@\s]{1,190}\.[A-Za-z]{2,24}")
 
 
 @dataclass
@@ -26,6 +31,7 @@ class SessionResources:
     persona: Persona
     inbox_dir: Path
     session_id: str
+    messages_left: int = 2  # leave_message calls allowed per conversation
 
 
 async def _show(params: FunctionCallParams, card: str, data: dict) -> None:
@@ -80,9 +86,14 @@ async def leave_message(
         message: What the visitor wants the owner to know.
     """
     res: SessionResources = params.app_resources
-    if "@" not in visitor_email or len(message) > 2000:
-        await params.result_callback({"saved": False, "reason": "need a valid email and a shorter message"})
+    if res.messages_left <= 0:
+        await params.result_callback({"saved": False, "reason": "this conversation already sent its messages"})
         return
+    visitor_name, visitor_email, message = clean(visitor_name)[:100], clean(visitor_email)[:200], clean(message)[:1500]
+    if not EMAIL.fullmatch(visitor_email) or not message:
+        await params.result_callback({"saved": False, "reason": "need a valid email address and a message"})
+        return
+    res.messages_left -= 1
     res.inbox_dir.mkdir(parents=True, exist_ok=True)
     entry = {
         "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

@@ -22,17 +22,17 @@ const LAUNCHER_CSS = `
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 :host([mode="bubble"]) { position: fixed; right: 20px; bottom: 20px; z-index: 2147483000; }
 :host([mode="inline"]) { display: block; width: 100%; height: 640px; }
-.launch { display: flex; align-items: center; gap: 12px; border: 0; cursor: pointer;
+.of-launch { display: flex; align-items: center; gap: 12px; border: 0; cursor: pointer;
   background: var(--of-accent, #17202b); color: #fff; border-radius: 999px; padding: 7px 20px 7px 7px;
   box-shadow: 0 14px 40px rgba(23,32,43,.3); font: 650 15px/1 ui-sans-serif, system-ui, -apple-system, sans-serif; }
-.launch:hover { transform: translateY(-1px); }
-.launch:focus-visible { outline: 3px solid #128a6a; outline-offset: 3px; }
-.dot { position: relative; width: 42px; height: 42px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #dce3ea, #b7c3cf);
+.of-launch:hover { transform: translateY(-1px); }
+.of-launch:focus-visible { outline: 3px solid #128a6a; outline-offset: 3px; }
+.of-badge { position: relative; width: 42px; height: 42px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #dce3ea, #b7c3cf);
   color: #17202b; display: grid; place-items: center; font-size: 12px; font-weight: 750; }
-.dot::after { content: ""; position: absolute; right: 0; bottom: 1px; width: 11px; height: 11px; border-radius: 50%;
+.of-badge::after { content: ""; position: absolute; right: 0; bottom: 1px; width: 11px; height: 11px; border-radius: 50%;
   background: #128a6a; box-shadow: 0 0 0 2px var(--of-accent, #17202b); }
-@media (prefers-reduced-motion: reduce) { .launch:hover { transform: none; } }
-.loading { padding: 16px; color: #666; font: 14px inherit; }
+@media (prefers-reduced-motion: reduce) { .of-launch:hover { transform: none; } }
+.of-loading { padding: 16px; color: #666; font: 14px inherit; }
 `;
 
 class OpenfolioAgent extends HTMLElement {
@@ -52,10 +52,10 @@ class OpenfolioAgent extends HTMLElement {
     }
     const name = this.getAttribute("label") || "Talk to me";
     const button = document.createElement("button");
-    button.className = "launch";
+    button.className = "of-launch";
     button.setAttribute("aria-label", `${name} (AI)`);
     const dot = document.createElement("span");
-    dot.className = "dot";
+    dot.className = "of-badge";
     dot.textContent = "AI";
     const text = document.createElement("span");
     text.textContent = name;
@@ -72,10 +72,10 @@ class OpenfolioAgent extends HTMLElement {
     if (this.opened) return;
     this.opened = true;
     const root = this.shadowRoot!;
-    const launcher = root.querySelector(".launch") as HTMLElement | null;
+    const launcher = root.querySelector(".of-launch") as HTMLElement | null;
     if (launcher) launcher.style.display = "none";
     const loading = document.createElement("div");
-    loading.className = "loading";
+    loading.className = "of-loading";
     loading.textContent = "Loading…";
     root.append(loading);
     try {

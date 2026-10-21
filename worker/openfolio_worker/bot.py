@@ -12,7 +12,16 @@ import asyncio
 
 from loguru import logger
 from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.frames.frames import LLMRunFrame
+from pipecat.frames.frames import (
+    BotSpeakingFrame,
+    InterimTranscriptionFrame,
+    LLMMessagesAppendFrame,
+    LLMRunFrame,
+    TranscriptionFrame,
+    UserSpeakingFrame,
+    UserStartedSpeakingFrame,
+)
+from pipecat.processors.frameworks.rtvi.frames import RTVIServerMessageFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker, ProcessorUnusablePolicy
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -28,6 +37,7 @@ from pipecat.workers.runner import WorkerRunner
 
 from .config import Settings, llm_extra_params
 from .persona import Persona, build_system_prompt
+from .guard import VisitorGuard
 from .tools import ALL_TOOLS, SessionResources
 
 
@@ -103,6 +113,8 @@ def make_llm(s: Settings, persona: Persona) -> OpenAILLMService:
         settings=OpenAILLMService.Settings(
             model=s.llm_model,
             system_instruction=build_system_prompt(persona),
+            # Spoken answers are short; this also caps what one request can cost.
+            max_completion_tokens=300,
             extra=llm_extra_params(s),
         ),
     )
@@ -130,6 +142,7 @@ async def run_conversation(
         [
             transport.input(),
             stt,
+            VisitorGuard(persona.first_name, session_id),
             user_aggregator,
             llm,
             tts,
@@ -145,6 +158,18 @@ async def run_conversation(
             persona=persona, inbox_dir=settings.inbox_dir, session_id=session_id
         ),
         processor_unusable_policy=ProcessorUnusablePolicy.END,
+        # Hang up after this long with nobody speaking or typing. The bot's own
+        # speech counts as activity, so the clock starts when it finishes.
+        idle_timeout_secs=persona.idle_seconds,
+        idle_timeout_frames=(
+            BotSpeakingFrame,
+            InterimTranscriptionFrame,
+            TranscriptionFrame,
+            UserSpeakingFrame,
+            UserStartedSpeakingFrame,
+            LLMMessagesAppendFrame,
+        ),
+        cancel_on_idle_timeout=False,
     )
     runner = WorkerRunner(handle_sigint=False)
     await runner.add_workers(worker)
@@ -160,6 +185,13 @@ async def run_conversation(
             }
         )
         await worker.queue_frames([LLMRunFrame()])
+
+    @worker.event_handler("on_idle_timeout")
+    async def on_idle_timeout(worker):
+        logger.info(f"[{session_id}] no activity for {persona.idle_seconds}s; hanging up")
+        await worker.queue_frames([RTVIServerMessageFrame(data={"type": "openfolio.ended", "reason": "idle"})])
+        await asyncio.sleep(0.5)  # let the message reach the browser
+        await runner.cancel()
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):

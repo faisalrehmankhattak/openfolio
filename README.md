@@ -16,7 +16,8 @@ Working end to end and tested in a headless browser:
 - **Voice.** A Pipecat worker runs one pipeline per visitor over WebRTC: speech-to-text, LLM with tools, text-to-speech.
 - **Face.** TalkingHead renders a rigged 3D head in three.js. HeadAudio lip-syncs it from the incoming voice in the browser.
 - **Cards.** The persona calls tools (`show_projects`, `show_experience`, `show_skills`, `show_contact`, `leave_message`) and the widget shows matching cards in the chat.
-- **Guardrails.** Persona-specific allowed origins, a cap on concurrent calls, a per-call time limit, an "AI version" badge and a first-line disclosure.
+- **Guardrails.** Prompt-injection screening, portfolio-only answers, hang-up after 60 seconds of quiet, per-IP call limits, allowed origins, turn and length caps, an "AI version" badge and a first-line disclosure. See [Safeguards](docs/ARCHITECTURE.md#safeguards).
+- **Text first.** Typing or tapping a suggestion starts a conversation without asking for the microphone; the mic button adds voice any time.
 - **No third-party calls from the browser.** The widget talks only to your server.
 
 Not built yet: photo-to-3D (LAM), the owner studio, accounts and billing. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

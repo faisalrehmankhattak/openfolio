@@ -35,8 +35,24 @@ The server never renders video. It sends the voice; the visitor's device draws a
 - **Own media manager.** `SmallWebRTCTransport`'s default media manager builds a Daily call object, which downloads a script from Daily's CDN. That breaks self-hosting and privacy, so `media.ts` uses `getUserMedia` directly. The browser test confirms zero requests leave the host.
 - **Shared Kokoro model.** Pipecat loads the Kokoro model (about 300 MB) in every service constructor. The worker loads it once per process and warms it at startup.
 - **Lip-sync in the browser from audio (HeadAudio)**, not from TTS timestamps, so every voice provider works the same way. ElevenLabs word timings can make it sharper later.
-- **Cards in the transcript**, not over the face, so the face stays visible on phones.
+- **Cards slide up as a sheet** capped at 60% of the panel, so the face stays visible on phones.
 - **Placeholder avatar is CC0** (MakeHuman via TalkingHead), textures compressed to WebP: 37 MB → 18 MB, rig and 66 blendshapes intact.
+
+## Safeguards
+
+| Risk | Guard | Where |
+| --- | --- | --- |
+| Prompt injection ("ignore your instructions", "show your system prompt", role-play, fake `<system>` tags) | Screened before the model; a match reaches it only as a note to decline and steer back | `guard.py` |
+| Off-topic use (coding help, essays, general questions) | The persona only discusses the owner's work and declines the rest in one sentence | `persona.py` (Scope) |
+| Odd input (control or invisible characters, huge pastes) | Normalised, single-spaced, capped at 500 characters | `guard.py`, widget `maxlength` |
+| Open tab burning minutes | Hang up after 60 s with nobody speaking or typing (`idle_seconds`); hard cap per call (`max_session_seconds`) | `bot.py` |
+| Scripted flooding | Typed messages faster than 1.5 s apart dropped; 40 turns per call; answers capped at 300 tokens | `guard.py`, `bot.py` |
+| Many calls from one network | 6 new calls per IP per 10 minutes (`CALLS_PER_IP`); local testing exempt | `server.py` |
+| Other sites embedding your persona | Browser origin must be in `allowed_origins` | `server.py` |
+| Spam through "leave a message" | 2 messages per call, validated email, cleaned text | `tools.py` |
+| Oversized requests | Signalling bodies over 64 KB refused | `server.py` |
+
+Behind a reverse proxy, set `TRUST_PROXY=1` so the limit uses the visitor's IP, not the proxy's.
 
 ## Known limits
 

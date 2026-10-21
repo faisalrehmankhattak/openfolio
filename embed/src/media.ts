@@ -15,6 +15,8 @@ export class LocalMediaManager {
   private _micEnabled = true;
   private stream: MediaStream | null = null;
   private micTrack: MediaStreamTrack | null = null;
+  /** Set by the app: puts a newly acquired mic track on the live connection. */
+  onLocalTrack: ((track: MediaStreamTrack) => Promise<void> | void) | null = null;
 
   setUserAudioCallback(_cb: unknown) {}
 
@@ -81,7 +83,19 @@ export class LocalMediaManager {
 
   enableMic(enable: boolean) {
     this._micEnabled = enable;
-    if (this.micTrack) this.micTrack.enabled = enable;
+    if (this.micTrack) {
+      this.micTrack.enabled = enable;
+      return;
+    }
+    // A call that started from typing has no mic yet: ask for it now.
+    if (enable) {
+      void this.acquire()
+        .then(() => this.micTrack && this.onLocalTrack?.(this.micTrack))
+        .catch((err) => {
+          this._micEnabled = false;
+          (this._callbacks as any).onDeviceError?.(err);
+        });
+    }
   }
   enableCam(_enable: boolean) {}
   enableScreenShare(_enable: boolean) {}

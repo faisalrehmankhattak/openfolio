@@ -34,3 +34,18 @@ def test_unconfigured_server_refuses_calls():
     r = c.post("/v1/personas/faisal/offer", json={"sdp": "x", "type": "offer"},
                headers={"origin": "https://faisalrehmanktk.com"})
     assert r.status_code == 503
+
+
+def test_rate_limit_per_ip(monkeypatch):
+    # A limit of zero refuses the first call, before any WebRTC is set up.
+    monkeypatch.setenv("CALLS_PER_IP", "0")
+    s = replace(load_settings(), deepgram_api_key="x", llm_api_key="x", llm_model="m")
+    r = TestClient(create_app(s)).post("/v1/personas/faisal/offer", json={"sdp": "x", "type": "offer"},
+                                       headers={"origin": "https://faisalrehmanktk.com"})
+    assert r.status_code == 429
+
+
+def test_oversized_offer_rejected():
+    r = client().post("/v1/personas/faisal/offer", content=b"{" + b" " * 70_000 + b"}",
+                      headers={"origin": "https://faisalrehmanktk.com", "content-type": "application/json"})
+    assert r.status_code == 413

@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 import uuid
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -44,6 +46,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     active: dict[str, asyncio.Task] = {}
     checks: dict[str, dict] = {}
+    calls_by_ip: dict[str, deque] = defaultdict(deque)
+    CALLS_PER_WINDOW, WINDOW_SECONDS = int(os.getenv("CALLS_PER_IP", "6")), 600
+    trust_proxy = os.getenv("TRUST_PROXY") == "1"
+
+    def client_ip(request: Request) -> str:
+        # Behind a reverse proxy, set TRUST_PROXY=1 so the real visitor IP is used.
+        if trust_proxy and (fwd := request.headers.get("x-forwarded-for")):
+            return fwd.split(",")[0].strip()
+        return request.client.host if request.client else "unknown"
+
+    def allow_new_call(ip: str) -> bool:
+        now = time.monotonic()
+        q = calls_by_ip[ip]
+        while q and now - q[0] > WINDOW_SECONDS:
+            q.popleft()
+        if len(q) >= CALLS_PER_WINDOW:
+            return False
+        q.append(now)
+        return True
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -103,6 +124,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def offer(persona_id: str, request: Request):
         persona = get_persona(persona_id)
         check_origin(request, persona)
+        if int(request.headers.get("content-length") or 0) > 64_000:
+            raise HTTPException(413, "Request too large")
         body = await request.json()
         webrtc_request = SmallWebRTCRequest.from_dict(
             {k: body[k] for k in ("sdp", "type", "pc_id", "restart_pc", "requestData", "request_data") if k in body}
@@ -114,6 +137,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 raise HTTPException(503, "Server is not configured: " + "; ".join(problems))
             if len(active) >= settings.max_sessions:
                 raise HTTPException(503, "All lines are busy, try again in a minute")
+            ip = client_ip(request)
+            # Testing on your own machine (a local page talking to a local server) is not limited.
+            local_test = ip in ("127.0.0.1", "::1") and request.headers.get("origin", "") in settings.dev_origins
+            if not local_test and not allow_new_call(ip):
+                raise HTTPException(429, "Too many calls from this network. Try again in a few minutes.")
 
         async def on_connection(connection: SmallWebRTCConnection):
             session_id = uuid.uuid4().hex[:12]
@@ -135,6 +163,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.patch("/v1/personas/{persona_id}/offer")
     async def ice_candidate(persona_id: str, request: Request):
         get_persona(persona_id)
+        check_origin(request, get_persona(persona_id))
+        if int(request.headers.get("content-length") or 0) > 64_000:
+            raise HTTPException(413, "Request too large")
         body = await request.json()
         await handler.handle_patch_request(
             SmallWebRTCPatchRequest(
