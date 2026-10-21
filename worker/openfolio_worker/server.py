@@ -12,6 +12,7 @@ Routes
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -29,7 +30,8 @@ from pipecat.transports.smallwebrtc.request_handler import (
     SmallWebRTCRequestHandler,
 )
 
-from .bot import run_conversation, warm_up_voice
+from .bot import run_conversation
+from .doctor import run_checks
 from .config import ROOT, Settings, load_settings
 from .persona import Persona, load_personas
 
@@ -41,17 +43,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ice_servers=[IceServer(**s) for s in settings.ice_servers] or None
     )
     active: dict[str, asyncio.Task] = {}
+    checks: dict[str, dict] = {}
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         for problem in settings.check():
             logger.warning(f"Config: {problem}")
         logger.info(f"Loaded personas: {', '.join(personas) or 'none'}")
-        try:
-            await asyncio.to_thread(warm_up_voice, settings)
-            logger.info("Voice warmed up")
-        except Exception as e:  # the server still serves pages; calls will report the error
-            logger.warning(f"Voice warm-up failed: {e}")
+        # Test every provider with a tiny real request (and warm up the voice),
+        # so a bad key or model name shows up here, not as a silent call.
+        if os.getenv("OPENFOLIO_SKIP_CHECKS") != "1":
+            checks.update(await run_checks(settings))
+        if not all(c["ok"] for c in checks.values()):
+            logger.error("Some checks failed; calls will not work until they pass. See above or GET /healthz.")
         yield
         for task in active.values():
             task.cancel()
@@ -87,7 +91,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/healthz")
     async def healthz():
-        return {"ok": True, "active_sessions": len(active), "config_problems": settings.check()}
+        problems = settings.check()
+        ok = not problems and all(c["ok"] for c in checks.values())
+        return {"ok": ok, "active_sessions": len(active), "config_problems": problems, "checks": checks}
 
     @app.get("/v1/personas/{persona_id}")
     async def persona_info(persona_id: str):
@@ -165,6 +171,10 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=7860)
     args = parser.parse_args()
+    # Keep a log file next to the code so problems can be read after the fact.
+    log_dir = ROOT / "data"
+    log_dir.mkdir(exist_ok=True)
+    logger.add(log_dir / "worker.log", level="INFO", rotation="5 MB", retention=3, enqueue=True)
     uvicorn.run(create_app(), host=args.host, port=args.port)
 
 

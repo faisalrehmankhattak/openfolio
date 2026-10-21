@@ -1,15 +1,19 @@
 /**
  * app.js — loaded by embed.js when a visitor opens the widget.
  *
+ * A portrait call: the 3D face fills the panel, speech appears as captions,
+ * cards and the transcript slide up as sheets.
+ *
  * Voice: Pipecat client over WebRTC to the Openfolio worker.
- * Face: TalkingHead renders the 3D head; HeadAudio turns the incoming voice
- * into mouth shapes in the browser, so the server never sends video.
+ * Face: TalkingHead renders the head; HeadAudio lip-syncs it from the incoming
+ * voice in the browser, so the server never sends video.
  */
 import { PipecatClient } from "@pipecat-ai/client-js";
 import { SmallWebRTCTransport } from "@pipecat-ai/small-webrtc-transport";
 import { renderCard } from "./cards";
-import { LocalMediaManager } from "./media";
 import { h } from "./dom";
+import { icon } from "./icons";
+import { LocalMediaManager } from "./media";
 import { PANEL_CSS } from "./styles";
 
 export type MountOptions = {
@@ -30,16 +34,14 @@ type PersonaInfo = {
   quick_questions: { label: string; question: string }[];
 };
 
-type Head = {
-  audioCtx: AudioContext;
-  audioAnalyzerNode: AudioNode;
-  start(): void;
-  stop(): void;
-};
+type Head = { audioCtx: AudioContext; audioAnalyzerNode: AudioNode; start(): void; stop(): void };
+type CallState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
+
+const isLocal = (url: string) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(url);
 
 export async function mount(root: ShadowRoot, opts: MountOptions) {
   const style = h("style", {}, PANEL_CSS);
-  const panel = h("div", { class: `panel ${opts.mode}`, role: "dialog", "aria-label": "AI assistant" });
+  const panel = h("div", { class: `panel ${opts.mode}`, role: "dialog", "aria-label": "Talk to an AI version" });
   root.append(style, panel);
 
   let info: PersonaInfo;
@@ -48,48 +50,130 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     if (!res.ok) throw new Error(`persona ${res.status}`);
     info = await res.json();
   } catch (err) {
-    panel.append(h("p", { class: "msg note" }, "This assistant isn't available right now."));
+    panel.append(h("div", { class: "fallback" }, h("p", {}, "This assistant isn't available right now.")));
     console.error("[openfolio]", err);
     return;
   }
+  const first = info.first_name;
+  const showDetails = isLocal(opts.server) || isLocal(location.href);
 
   // ---- layout -------------------------------------------------------------
-  const status = h("div", { class: "status", "aria-live": "polite" }, "Loading face…");
-  const headEl = h("div", { class: "head" });
-  const stage = h("div", { class: "stage" }, headEl, status);
-  const log = h("div", { class: "log", "aria-live": "polite" });
-  const input = h("input", { type: "text", placeholder: `Ask ${info.first_name} anything…`, "aria-label": "Your message", maxlength: "500" });
-  const talk = h("button", { class: "talk", type: "button" }, "Talk");
-  const mic = h("button", { class: "mic", type: "button", "aria-pressed": "false", "aria-label": "Mute microphone", hidden: true }, "Mic");
+  const headEl = h("div", { class: "head", "aria-hidden": "true" });
+  const loading = h("div", { class: "loading" }, "Loading face");
+  const stateEl = h("div", { class: "state" }, h("span", { class: "dot" }), h("span", {}, info.title));
+  const transcriptBtn = h("button", { class: "iconbtn", type: "button", "aria-label": "Show transcript" }, icon("transcript"));
+  const closeBtn = h("button", { class: "iconbtn", type: "button", "aria-label": "Close" }, icon("close"));
+  const top = h(
+    "div",
+    { class: "top" },
+    h("div", { class: "who" }, h("div", { class: "name" }, info.name), stateEl),
+    h("span", { class: "ai", title: `This is an AI version of ${first}, answering from ${first}'s portfolio` }, "AI version"),
+    transcriptBtn,
+    opts.mode === "bubble" ? closeBtn : null,
+  );
+
+  const capUser = h("div", { class: "cap-user" });
+  const capBot = h("div", { class: "cap-bot hint" }, `Ask me anything about my work. I'm an AI version of ${first}.`);
+  const captions = h("div", { class: "captions", "aria-live": "polite" }, capUser, capBot);
+
   const suggest = h(
     "div",
     { class: "suggest" },
     ...info.quick_questions.map((q) => h("button", { type: "button", onclick: () => void ask(q.question) }, q.label)),
   );
-  const close = h("button", { class: "icon", type: "button", "aria-label": "Close" }, "×");
-  panel.append(
-    h(
-      "header",
-      {},
-      h("div", { class: "who" }, h("div", { class: "name" }, info.name), h("div", { class: "title" }, info.title)),
-      h("span", { class: "badge", title: `This is an AI version of ${info.first_name}` }, "AI version"),
-      opts.mode === "bubble" ? close : null,
-    ),
-    stage,
-    log,
-    suggest,
-    h("form", { class: "controls", onsubmit: (e: Event) => { e.preventDefault(); void ask(input.value); } }, mic, input, talk),
-    h("footer", {}, `AI version of ${info.first_name}. It can make mistakes. `, h("a", { href: "https://github.com/openfolio", target: "_blank", rel: "noopener" }, "Openfolio")),
+
+  // Card sheet and transcript sheet share one look.
+  function makeSheet(label: string) {
+    const title = h("h3", {}, label);
+    const body = h("div", { class: "sheet-body" });
+    const close = h("button", { class: "iconbtn", type: "button", "aria-label": `Close ${label.toLowerCase()}` }, icon("down"));
+    const el = h("section", { class: "sheet", "aria-label": label }, h("div", { class: "sheet-head" }, title, close), body);
+    close.addEventListener("click", () => el.classList.remove("open"));
+    return { el, title, body };
+  }
+  const cardSheet = makeSheet("Card");
+  const logSheet = makeSheet("Transcript");
+
+  const startBtn = h("button", { class: "start", type: "button", disabled: true }, icon("mic"), h("span", {}, `Talk to ${first}`));
+  const micBtn = h("button", { class: "mic", type: "button", hidden: true, "aria-label": "Mute microphone" }, h("span", { class: "ring" }), icon("mic"));
+  const typeBtn = h("button", { class: "side", type: "button", "aria-label": "Type a question", disabled: true }, icon("keyboard"));
+  const endBtn = h("button", { class: "side end", type: "button", "aria-label": "End call", hidden: true }, icon("end"));
+  const input = h("input", { type: "text", placeholder: `Ask ${first} anything`, "aria-label": "Your question", maxlength: "500", enterkeyhint: "send" });
+  const sendBtn = h("button", { class: "side send", type: "submit", "aria-label": "Send" }, icon("send"));
+  const backBtn = h("button", { class: "side", type: "button", "aria-label": "Back to voice" }, icon("mic"));
+  const typeRow = h(
+    "form",
+    { class: "type", hidden: true, onsubmit: (e: Event) => { e.preventDefault(); void ask(input.value); } },
+    backBtn,
+    input,
+    sendBtn,
   );
-  addNote(`Tap Talk to speak with the AI version of ${info.first_name}, or type below.`);
+  const bar = h("div", { class: "bar" }, typeBtn, startBtn, micBtn, endBtn, typeRow);
+  const foot = h("div", { class: "foot" }, `An AI version of ${first}, answering from ${first}'s portfolio`);
+
+  const lower = h("div", { class: "lower" }, captions, suggest);
+  panel.append(headEl, loading, top, lower, cardSheet.el, logSheet.el, bar, foot);
+
+  // ---- transcript + captions ---------------------------------------------
+  type Turn = { el: HTMLElement; segments: Map<string, string> };
+  let botTurn: Turn | null = null;
+
+  function logLine(text: string, kind: "user" | "bot" | "note") {
+    const el = h("p", { class: `line ${kind}` }, text);
+    logSheet.body.append(el);
+    logSheet.body.scrollTop = logSheet.body.scrollHeight;
+    return el;
+  }
+  function showHint(text: string, kind: "hint" | "error" = "hint") {
+    capBot.className = `cap-bot ${kind}`;
+    capBot.textContent = text;
+  }
+  function userSaid(text: string, final: boolean) {
+    capUser.textContent = text;
+    if (final) {
+      logLine(`You: ${text}`, "user");
+      botTurn = null;
+    }
+  }
+  // Pipecat reports each sentence several times (queued, then spoken) under one
+  // segment id; keep one entry per segment and show the latest sentences.
+  function botSaid(text: string, segmentId?: string | number) {
+    if (!botTurn) botTurn = { el: logLine("", "bot"), segments: new Map() };
+    botTurn.segments.set(segmentId === undefined ? `t:${text}` : `s:${segmentId}`, text);
+    const sentences = [...botTurn.segments.values()];
+    botTurn.el.textContent = `${first}: ${sentences.join(" ")}`;
+    capBot.className = "cap-bot";
+    capBot.textContent = sentences.slice(-2).join(" ");
+  }
+
+  function showCard(card: string, data: unknown) {
+    const c = renderCard(card, data, first);
+    if (!c) return;
+    cardSheet.title.textContent = c.title;
+    cardSheet.body.replaceChildren(c.body);
+    logSheet.el.classList.remove("open");
+    cardSheet.el.classList.add("open");
+  }
+  transcriptBtn.addEventListener("click", () => {
+    cardSheet.el.classList.remove("open");
+    logSheet.el.classList.toggle("open");
+  });
 
   // ---- face ---------------------------------------------------------------
   let head: Head | null = null;
-  const faceReady = loadFace().catch((err) => {
-    console.warn("[openfolio] 3D face unavailable, using voice only", err);
-    headEl.replaceChildren(h("div", { class: "fallback" }, h("span", {}, info.first_name.slice(0, 1))));
-    return null;
-  });
+  let faceDone = false;
+  const faceReady = loadFace()
+    .catch((err) => {
+      console.warn("[openfolio] 3D face unavailable, using voice only", err);
+      headEl.replaceChildren(h("div", { class: "fallback" }, h("span", {}, first.slice(0, 1))));
+      return null;
+    })
+    .finally(() => {
+      loading.remove();
+      faceDone = true;
+      startBtn.disabled = state !== "idle";
+      typeBtn.disabled = false;
+    });
 
   async function loadFace(): Promise<Head> {
     const [{ TalkingHead }, { HeadAudio }] = await Promise.all([
@@ -100,14 +184,14 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     const th: any = new TalkingHead(headEl, {
       ttsEndpoint: "N/A",
       lipsyncModules: [],
-      cameraView: "head",
+      cameraView: "upper",
       cameraRotateEnable: false,
       mixerGainSpeech: 3,
       avatarMood: "neutral",
     });
     const avatarUrl = new URL(info.avatar.url, `${opts.server}/`).href;
     await th.showAvatar({ url: avatarUrl, body: info.avatar.body || "M", avatarMood: "neutral", lipsyncLang: "en" }, (ev: ProgressEvent) => {
-      if (ev.lengthComputable) status.textContent = `Loading face… ${Math.round((ev.loaded / ev.total) * 100)}%`;
+      if (ev.lengthComputable) loading.textContent = `Loading face ${Math.round((ev.loaded / ev.total) * 100)}%`;
     });
 
     // Audio-driven lip-sync: works with any voice, no timestamps needed.
@@ -127,67 +211,65 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "visible") { th.start(); lips.start(); } else { lips.stop(); th.stop(); }
     });
-    status.textContent = "Ready";
     head = th as Head;
     return head;
+  }
+
+  // ---- call state ---------------------------------------------------------
+  let state: CallState = "idle";
+  function setState(next: CallState) {
+    state = next;
+    const live = next !== "idle" && next !== "connecting";
+    const words: Record<CallState, string> = {
+      idle: info.title,
+      connecting: "Connecting",
+      listening: "Listening",
+      thinking: "Thinking",
+      speaking: "Speaking",
+    };
+    stateEl.className = `state${live ? " live" : ""}${next === "speaking" ? " speaking" : ""}`;
+    (stateEl.lastChild as HTMLElement).textContent = words[next];
+    startBtn.hidden = next !== "idle" && next !== "connecting";
+    startBtn.disabled = next === "connecting" || !faceDone;
+    micBtn.hidden = !live;
+    endBtn.hidden = !live;
+    suggest.hidden = live && state !== "listening";
+  }
+
+  // ---- mic level ring -----------------------------------------------------
+  let levelStop: (() => void) | null = null;
+  function watchMicLevel(track: MediaStreamTrack) {
+    levelStop?.();
+    const ctx = head?.audioCtx ?? new AudioContext();
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    ctx.createMediaStreamSource(new MediaStream([track])).connect(analyser);
+    const buf = new Uint8Array(analyser.fftSize);
+    let raf = 0;
+    const tick = () => {
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (const v of buf) sum += ((v - 128) / 128) ** 2;
+      const rms = Math.sqrt(sum / buf.length);
+      micBtn.style.setProperty("--level", String(1 + Math.min(rms * 4, 0.45)));
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    levelStop = () => { cancelAnimationFrame(raf); analyser.disconnect(); };
   }
 
   // ---- conversation -------------------------------------------------------
   let client: PipecatClient | null = null;
   let connecting: Promise<void> | null = null;
-  let botBubble: HTMLElement | null = null;
-  let mutedEl: HTMLAudioElement | null = null;
-
-  function addNote(text: string) {
-    log.append(h("div", { class: "msg note" }, text));
-    log.scrollTop = log.scrollHeight;
-  }
-  function addUser(text: string) {
-    log.append(h("div", { class: "msg user" }, text));
-    botBubble = null;
-    log.scrollTop = log.scrollHeight;
-  }
-  // Pipecat reports each sentence several times (queued, then spoken) under one
-  // segment id, so the transcript keeps one line per segment and updates it.
-  const segments = new Map<string, HTMLElement>();
-  function addBot(text: string, segmentId?: string | number) {
-    if (!botBubble) {
-      botBubble = h("div", { class: "msg bot" });
-      log.append(botBubble);
-    }
-    const key = segmentId === undefined ? `t:${text}` : `s:${segmentId}`;
-    let span = segments.get(key);
-    if (!span) {
-      span = h("span", {});
-      if (botBubble.childNodes.length) botBubble.append(" ");
-      botBubble.append(span);
-      segments.set(key, span);
-    }
-    span.textContent = text;
-    log.scrollTop = log.scrollHeight;
-  }
-  function showCard(card: string, data: unknown) {
-    const el = renderCard(card, data);
-    if (!el) return;
-    // Cards go into the conversation, so they never cover the face.
-    log.append(h("div", { class: "msg cardmsg" }, el));
-    botBubble = null;
-    log.scrollTop = log.scrollHeight;
-  }
-  function setLive(live: boolean) {
-    talk.textContent = live ? "End" : "Talk";
-    talk.classList.toggle("end", live);
-    mic.hidden = !live;
-    if (live) status.replaceChildren(h("span", { class: "live-dot", "aria-hidden": "true" }), "Live");
-    else status.textContent = head ? "Ready" : status.textContent;
-  }
+  let playEl: HTMLAudioElement | null = null;
+  let muted = false;
 
   async function connect() {
     if (client) return;
     if (connecting) return connecting;
     connecting = (async () => {
-      talk.disabled = true;
-      status.textContent = "Connecting…";
+      setState("connecting");
+      cardSheet.el.classList.remove("open");
       // Must run inside the click: browsers only start audio after a gesture.
       const face = head;
       if (face) {
@@ -201,44 +283,63 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
         enableCam: false,
         callbacks: {
           onTrackStarted: (track, participant) => {
-            if (participant?.local || track.kind !== "audio") return;
+            if (track.kind !== "audio") return;
+            if (participant?.local) return watchMicLevel(track);
             const stream = new MediaStream([track]);
+            playEl = new Audio();
+            playEl.srcObject = stream;
             if (face) {
               // Old Chrome only feeds remote tracks to Web Audio once an element touches them.
-              mutedEl = new Audio();
-              mutedEl.muted = true;
-              mutedEl.srcObject = stream;
+              playEl.muted = true;
               face.audioCtx.createMediaStreamSource(stream).connect(face.audioAnalyzerNode);
             } else {
-              mutedEl = new Audio();
-              mutedEl.autoplay = true;
-              mutedEl.srcObject = stream;
+              playEl.autoplay = true;
             }
           },
-          onUserTranscript: (d) => { if (d.final && d.text.trim()) addUser(d.text); },
+          onUserStartedSpeaking: () => setState("listening"),
+          onUserStoppedSpeaking: () => setState("thinking"),
+          onBotStartedSpeaking: () => setState("speaking"),
+          onBotStoppedSpeaking: () => setState("listening"),
+          onUserTranscript: (d) => { if (d.text.trim()) userSaid(d.text.trim(), d.final); },
           onBotOutput: (d) => {
             const kind = d.text_type ?? d.aggregated_by;
             if (kind !== "sentence") return;
             const p = d.spoken_progress;
             const full = p ? `${p.accumulated_text ?? ""}${p.remaining_text ?? ""}` : d.text;
-            if (full.trim()) addBot(full.trim(), d.segment_id);
+            if (full.trim()) botSaid(full.trim(), d.segment_id);
           },
           onServerMessage: (m: any) => { if (m?.type === "openfolio.card") showCard(m.card, m.data); },
-          onDisconnected: () => { teardown(); addNote("Call ended."); },
-          onError: (e) => console.warn("[openfolio]", e),
+          onError: (e: any) => {
+            const raw = String(e?.data?.message || e?.data?.error || "");
+            console.warn("[openfolio]", e);
+            // Provider errors usually wrap a readable message: show just that.
+            const detail = (raw.match(/'message':\s*'([^']+)'/) || raw.match(/"message":\s*"([^"]+)"/) || [])[1] || raw;
+            // Timing warnings from the voice are not worth interrupting anyone.
+            const serious = e?.data?.fatal || /completion|model|api key|auth|quota|rate limit|denied|invalid/i.test(raw);
+            if (showDetails) logLine(`Error: ${detail}`, "note");
+            if (!serious) return;
+            showHint(showDetails ? `Server error: ${detail.slice(0, 220)}` : "Something went wrong on our side. Try again in a moment.", "error");
+          },
+          onDisconnected: () => {
+            teardown();
+            logLine("Call ended", "note");
+          },
         },
       });
       try {
         await c.connect({ webrtcRequestParams: { endpoint: `${opts.server}/v1/personas/${encodeURIComponent(opts.persona)}/offer` } });
         client = c;
-        setLive(true);
+        if (muted) c.enableMic(false);
+        setState("listening");
       } catch (err: any) {
         console.error("[openfolio]", err);
-        addNote(String(err?.message || "").includes("503") ? "All lines are busy. Please try again shortly." : "Couldn't connect. Check your microphone permission and try again.");
-        status.textContent = head ? "Ready" : status.textContent;
+        const msg = String(err?.message || err || "");
+        setState("idle");
+        if (/503/.test(msg)) showHint("All lines are busy. Try again in a minute.", "error");
+        else if (/Permission|NotAllowed/i.test(msg)) showHint("Allow microphone access to talk, or type your question instead.", "error");
+        else showHint(showDetails && msg ? `Couldn't connect: ${msg}` : "Couldn't connect. Check your connection and try again.", "error");
         try { await c.disconnect(); } catch {}
       } finally {
-        talk.disabled = false;
         connecting = null;
       }
     })();
@@ -247,49 +348,56 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
 
   function teardown() {
     client = null;
-    mutedEl?.pause();
-    mutedEl = null;
-    setLive(false);
+    levelStop?.();
+    levelStop = null;
+    playEl?.pause();
+    playEl = null;
+    setState("idle");
   }
 
   async function hangUp() {
     const c = client;
     teardown();
+    showHint("Call ended. Tap to talk again whenever you like.");
     try { await c?.disconnect(); } catch {}
   }
 
   async function ask(text: string) {
     const q = text.trim();
-    if (!q) return;
+    if (!q || !faceDone) return;
     input.value = "";
     if (!client) await connect();
     if (!client) return;
-    addUser(q);
+    userSaid(q, true);
+    setState("thinking");
     await client.sendText(q, { run_immediately: true, audio_response: true });
   }
 
-  // Wait for the face before allowing a call: audio must start inside the
-  // visitor's click, and the face has to exist by then to receive it.
-  const controls = [talk, input, ...Array.from(suggest.querySelectorAll("button"))] as (HTMLButtonElement | HTMLInputElement)[];
-  controls.forEach((c) => (c.disabled = true));
-  void faceReady.finally(() => controls.forEach((c) => (c.disabled = false)));
-
-  talk.addEventListener("click", async () => {
-    if (client) return hangUp();
-    await connect();
+  // ---- controls -----------------------------------------------------------
+  startBtn.addEventListener("click", () => void connect());
+  endBtn.addEventListener("click", () => void hangUp());
+  micBtn.addEventListener("click", () => {
+    muted = !muted;
+    client?.enableMic(!muted);
+    micBtn.classList.toggle("muted", muted);
+    micBtn.classList.toggle("on", !muted);
+    micBtn.setAttribute("aria-label", muted ? "Unmute microphone" : "Mute microphone");
+    micBtn.replaceChildren(h("span", { class: "ring" }), icon(muted ? "micOff" : "mic"));
   });
-  mic.addEventListener("click", () => {
-    if (!client) return;
-    const muted = mic.getAttribute("aria-pressed") !== "true";
-    client.enableMic(!muted);
-    mic.setAttribute("aria-pressed", String(muted));
-    mic.setAttribute("aria-label", muted ? "Unmute microphone" : "Mute microphone");
+  micBtn.classList.add("on");
+  typeBtn.addEventListener("click", () => {
+    typeRow.hidden = false;
+    input.focus();
   });
-  close.addEventListener("click", async () => {
+  backBtn.addEventListener("click", () => (typeRow.hidden = true));
+  closeBtn.addEventListener("click", async () => {
     await hangUp();
     head?.stop();
     style.remove();
     panel.remove();
     opts.onClose?.();
   });
+
+  void faceReady;
+  setState("idle");
 }

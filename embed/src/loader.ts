@@ -18,17 +18,20 @@ const assetBase = scriptUrl ? new URL(".", scriptUrl).href : "";
 const defaultServer = scriptUrl ? scriptUrl.origin : location.origin;
 
 const LAUNCHER_CSS = `
-:host { all: initial; --of-accent: #2f6fed; --of-ink: #14161a; --of-paper: #ffffff;
+:host { all: initial;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 :host([mode="bubble"]) { position: fixed; right: 20px; bottom: 20px; z-index: 2147483000; }
 :host([mode="inline"]) { display: block; width: 100%; height: 640px; }
-.launch { display: flex; align-items: center; gap: 10px; border: 0; cursor: pointer;
-  background: var(--of-ink); color: #fff; border-radius: 999px; padding: 8px 18px 8px 8px;
-  box-shadow: 0 8px 28px rgba(0,0,0,.22); font: 600 14px/1 inherit; }
-.launch:focus-visible { outline: 3px solid var(--of-accent); outline-offset: 3px; }
-.dot { width: 40px; height: 40px; border-radius: 50%; background: var(--of-accent);
-  display: grid; place-items: center; font-size: 15px; }
-.live { width: 8px; height: 8px; border-radius: 50%; background: #3ccf6e; }
+.launch { display: flex; align-items: center; gap: 12px; border: 0; cursor: pointer;
+  background: var(--of-accent, #17202b); color: #fff; border-radius: 999px; padding: 7px 20px 7px 7px;
+  box-shadow: 0 14px 40px rgba(23,32,43,.3); font: 650 15px/1 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+.launch:hover { transform: translateY(-1px); }
+.launch:focus-visible { outline: 3px solid #128a6a; outline-offset: 3px; }
+.dot { position: relative; width: 42px; height: 42px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #dce3ea, #b7c3cf);
+  color: #17202b; display: grid; place-items: center; font-size: 12px; font-weight: 750; }
+.dot::after { content: ""; position: absolute; right: 0; bottom: 1px; width: 11px; height: 11px; border-radius: 50%;
+  background: #128a6a; box-shadow: 0 0 0 2px var(--of-accent, #17202b); }
+@media (prefers-reduced-motion: reduce) { .launch:hover { transform: none; } }
 .loading { padding: 16px; color: #666; font: 14px inherit; }
 `;
 
@@ -56,9 +59,7 @@ class OpenfolioAgent extends HTMLElement {
     dot.textContent = "AI";
     const text = document.createElement("span");
     text.textContent = name;
-    const live = document.createElement("span");
-    live.className = "live";
-    button.append(dot, text, live);
+    button.append(dot, text);
     button.addEventListener("click", () => void this.open());
     root.append(button);
   }

@@ -42,7 +42,13 @@ Open http://127.0.0.1:7860 and click **Talk to Faisal**.
 | `LLM_API_KEY`, `LLM_MODEL`, `LLM_BASE_URL` | The brain; any OpenAI-compatible API | Point `LLM_BASE_URL` at a local Ollama |
 | `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` | Premium voice, your cloned voice | `TTS_PROVIDER=kokoro` (default) runs locally on CPU |
 
-`GET /healthz` lists anything missing.
+When the server starts it tests each provider with a tiny real request and logs the result. To run the same checks on their own:
+
+```sh
+cd worker && uv run openfolio-doctor
+```
+
+Logs are also written to `data/worker.log`. On your own machine, errors from the AI model or voice show up in the widget's captions.
 
 ## Add it to your portfolio
 
