@@ -39,6 +39,7 @@ from .config import Settings, llm_extra_params
 from .guard import VisitorGuard, ended
 from .persona import Persona, build_system_prompt
 from .tools import SessionResources, leave_message
+from .voice_chunks import ClauseAggregator
 
 MAX_ANSWER_TOKENS = 300  # spoken answers are short; this also caps the cost of one reply
 
@@ -106,7 +107,10 @@ def make_tts(s: Settings, persona: Persona) -> TTSService:
     from pipecat.services.kokoro.tts import KokoroTTSService
 
     _share_kokoro_model()
-    return KokoroTTSService(settings=KokoroTTSService.Settings(voice=persona.voice.voice_id or s.kokoro_voice))
+    tts = KokoroTTSService(settings=KokoroTTSService.Settings(voice=persona.voice.voice_id or s.kokoro_voice))
+    # Pipecat 1.13 has no option for this; streaming voices such as ElevenLabs keep sentence pieces.
+    tts._text_aggregator = ClauseAggregator(language=tts._text_aggregator.language)  # type: ignore[no-untyped-call]
+    return tts
 
 
 def make_llm(s: Settings, persona: Persona) -> OpenAILLMService:

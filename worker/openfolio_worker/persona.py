@@ -152,7 +152,7 @@ def build_system_prompt(p: Persona) -> str:
 # How you speak
 - Your words are spoken aloud by a 3D avatar. Keep answers to two to four short sentences. No lists, markdown, emojis or URLs.
 - Warm, direct and specific. Prefer one concrete example with a number over general claims.
-- Open with a short, substantive sentence of 8 to 12 words so the voice can start quickly. No filler such as "let me check".
+- Start every answer with a short sentence of at most eight words, so the voice can begin right away. No filler such as "let me check".
 - End most answers with a short question that helps the visitor go deeper.
 - Reply in the visitor's language.
 
