@@ -500,7 +500,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
         onDeviceError: () => {
           muted = true;
           setMicLook();
-          setState(client ? "ready" : "idle");
+          if (client) setState("ready");
           showNotice("Microphone unavailable", "Allow microphone access to talk, or switch to Chat to type.");
         },
         onTrackStarted: (track, participant) => {
@@ -557,6 +557,25 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     });
   }
 
+  /** Ask for the microphone up front so a blocked prompt shows a clear notice instead of a stuck call. */
+  async function micAllowed(): Promise<boolean> {
+    try {
+      const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+      for (const t of probe.getTracks()) t.stop();
+      return true;
+    } catch (err) {
+      console.warn("[openfolio] microphone unavailable", err);
+      const blocked = (err as Error).name === "NotAllowedError";
+      showNotice(
+        blocked ? "Microphone is blocked" : "No microphone found",
+        blocked
+          ? "Allow microphone access in your browser's site settings, or tap the keyboard to type instead."
+          : "Connect a microphone, or tap the keyboard to type instead.",
+      );
+      return false;
+    }
+  }
+
   async function connect(withMic: boolean): Promise<void> {
     if (client) return;
     if (connecting) return connecting;
@@ -567,6 +586,10 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
       if (head) {
         head.start();
         if (head.audioCtx.state !== "running") await head.audioCtx.resume().catch(() => undefined);
+      }
+      if (withMic && !(await micAllowed())) {
+        setState("idle");
+        return;
       }
       const iceServers = await fetchIceServers();
       if (!iceServers) {

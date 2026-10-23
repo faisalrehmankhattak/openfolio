@@ -47,10 +47,21 @@ export class LocalMediaManager {
   }
 
   async initialize() {
-    if (this._micEnabled) await this.acquire();
+    await this.tryAcquire();
   }
   async connect() {
-    if (this._micEnabled) await this.acquire();
+    await this.tryAcquire();
+  }
+
+  // The transport does not await device setup, so a thrown error would escape the connect flow.
+  private async tryAcquire() {
+    if (!this._micEnabled) return;
+    try {
+      await this.acquire();
+    } catch (err) {
+      this._micEnabled = false;
+      this._callbacks.onDeviceError?.(err);
+    }
   }
   async disconnect() {
     for (const t of this.stream?.getTracks() ?? []) t.stop();
