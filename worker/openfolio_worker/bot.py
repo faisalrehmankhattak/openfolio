@@ -176,6 +176,9 @@ async def run_conversation(
 
     @worker.event_handler("on_idle_timeout")
     async def on_idle_timeout(_worker: Any) -> None:
+        # Pipecat checks once per window; finishing at the exact deadline keeps silence from lasting two windows.
+        if wait := activity.seconds_until_idle(persona.idle_seconds):
+            await asyncio.sleep(wait)
         if not activity.is_idle(persona.idle_seconds):
             return
         logger.info(f"[{session_id}] no activity for {persona.idle_seconds}s; hanging up")

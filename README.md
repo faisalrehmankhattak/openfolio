@@ -185,7 +185,7 @@ npm run build
 
 `./scripts/docker-smoke.sh` checks a built image without API keys; `./scripts/docker-webrtc-smoke.sh` sends real WebRTC media across Docker's network boundary. CI runs all of these on amd64 and arm64.
 
-Not covered by automated tests: real microphones and speakers (echo), Safari and Firefox, screen readers, and calls across restrictive networks. Please report what you find.
+Browser flows (voice with recorded speech, chat, cards, guardrails, embedding, capacity, keyboard) were verified in Chrome, Firefox and WebKit. Not yet verified: real speakers (echo), Safari on iOS, screen readers and calls across restrictive networks. Please report what you find.
 
 ## Roadmap
 

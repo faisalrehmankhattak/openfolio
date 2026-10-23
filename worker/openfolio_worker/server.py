@@ -144,6 +144,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def is_local_test(request: Request) -> bool:
         return ip(request) in LOCAL_IPS and request.headers.get("origin", "") in dev_origins
 
+    def check_capacity() -> None:
+        if problems := settings.check():
+            raise HTTPException(503, "Server is not configured: " + "; ".join(problems))
+        if len(active) >= settings.max_sessions:
+            raise HTTPException(503, "All lines are busy. Try again in a minute.")
+
     def is_known_connection(pc_id: str | None) -> bool:
         # Pipecat has no public lookup; renegotiation must not count as a new call.
         return bool(pc_id) and pc_id in handler._pcs_map
@@ -200,6 +206,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/v1/personas/{persona_id}/ice-servers")
     async def ice_servers(persona_id: str, request: Request) -> JSONResponse:
         check_origin(request, get_persona(persona_id))
+        # Fetched right before every call, so the widget can explain a refusal before WebRTC starts retrying.
+        check_capacity()
         if not is_local_test(request) and not ice_limit.allow(ip(request)):
             raise HTTPException(429, "Too many requests. Try again in a few minutes.")
         return JSONResponse({"iceServers": browser_ice_servers(settings)}, headers={"Cache-Control": "no-store"})
@@ -211,10 +219,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         body: OfferBody = await read_json(request, OfferBody)
 
         if not is_known_connection(body.pc_id):
-            if problems := settings.check():
-                raise HTTPException(503, "Server is not configured: " + "; ".join(problems))
-            if len(active) >= settings.max_sessions:
-                raise HTTPException(503, "All lines are busy. Try again in a minute.")
+            check_capacity()
             if not is_local_test(request) and not call_limit.allow(ip(request)):
                 raise HTTPException(429, "Too many calls from this network. Try again in a few minutes.")
 

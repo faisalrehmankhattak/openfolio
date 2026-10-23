@@ -23,6 +23,9 @@ type CallState = "idle" | "connecting" | "listening" | "thinking" | "speaking" |
 // Head-and-shoulders framing for a tall portrait panel (TalkingHead "upper" view).
 const CAMERA = { y: 0.1, distance: -0.6 };
 const SPEECH_GAIN = 3;
+// The server ignores typed messages closer than 1.5 s apart; a quick double-send waits instead of being lost.
+const TYPED_GAP_MS = 1600;
+const CONNECT_TIMEOUT_MS = 20_000;
 
 const END_HINTS: Record<EndReason | "", string> = {
   idle: "The call ended because it went quiet. Ask anything to start again.",
@@ -430,6 +433,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
   let onFace = false;
   let muted = false;
   let endedReason: EndReason | "" = "";
+  let lastSentAt = 0;
 
   // The voice plays through the face (which lip-syncs it) once it is ready,
   // and through a plain audio element until then.
@@ -470,15 +474,11 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     if (face && face.audioCtx.state !== "running") void face.audioCtx.resume().then(() => moveAudioToFace(face));
   });
 
-  async function fetchIceServers(): Promise<RTCIceServer[] | null> {
-    try {
-      const res = await fetch(`${personaUrl}/ice-servers`);
-      if (!res.ok) throw new Error(`ICE configuration ${res.status}`);
-      return ((await res.json()) as { iceServers: RTCIceServer[] }).iceServers;
-    } catch (err) {
-      console.error("[openfolio]", err);
-      return null;
-    }
+  /** Also the server's admission check: busy, rate-limited and blocked calls are refused here, before WebRTC starts. */
+  async function fetchIceServers(): Promise<RTCIceServer[]> {
+    const res = await fetch(`${personaUrl}/ice-servers`);
+    if (!res.ok) throw new Error(`Connection settings refused (${res.status})`);
+    return ((await res.json()) as { iceServers: RTCIceServer[] }).iceServers;
   }
 
   function createClient(withMic: boolean, iceServers: RTCIceServer[], gen: number): PipecatClient {
@@ -591,16 +591,31 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
         setState("idle");
         return;
       }
-      const iceServers = await fetchIceServers();
-      if (!iceServers) {
+      let iceServers: RTCIceServer[];
+      try {
+        iceServers = await fetchIceServers();
+      } catch (err) {
+        if (gen !== generation) return;
+        console.error("[openfolio]", err);
+        const raw = String((err as Error | undefined)?.message ?? err);
+        const { title, body } = explainConnectError(raw);
         setState("idle");
-        showNotice("Couldn't connect", "Couldn't load connection settings. Try again in a moment.");
+        showNotice(title, body, showDetails ? raw : undefined);
         return;
       }
       muted = !withMic;
       const c = createClient(withMic, iceServers, gen);
       try {
-        await c.connect({ webrtcRequestParams: { endpoint: `${personaUrl}/offer` } });
+        // WebRTC retries failed offers silently; give up with a clear notice instead of spinning.
+        let timer = 0;
+        const timeout = new Promise<never>((_, reject) => {
+          timer = window.setTimeout(() => reject(new Error("Connection timed out")), CONNECT_TIMEOUT_MS);
+        });
+        try {
+          await Promise.race([c.connect({ webrtcRequestParams: { endpoint: `${personaUrl}/offer` } }), timeout]);
+        } finally {
+          clearTimeout(timer);
+        }
         if (gen !== generation) {
           await c.disconnect();
           return;
@@ -667,6 +682,10 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     userSaid(q, true);
     // Typing never asks for the microphone; the mic button adds voice later.
     if (!client) await connect(false);
+    if (!client) return;
+    const wait = lastSentAt + TYPED_GAP_MS - Date.now();
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastSentAt = Date.now();
     if (!client) return;
     setState("thinking");
     try {

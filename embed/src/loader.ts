@@ -88,7 +88,10 @@ class OpenfolioAgent extends HTMLElement {
         mode: this.mode,
         onClose: () => {
           this.opened = false;
-          if (launcher) launcher.style.display = "";
+          if (launcher) {
+            launcher.style.display = "";
+            launcher.focus(); // keyboard users land back where they started
+          }
         },
       });
     } catch (err) {

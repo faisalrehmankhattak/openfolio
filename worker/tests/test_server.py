@@ -52,6 +52,8 @@ def test_cors_allows_persona_origin(client):
 def test_unconfigured_server_refuses_calls():
     c = TestClient(create_app(load_settings()))
     assert c.post("/v1/personas/faisal/offer", json=OFFER, headers=ORIGIN).status_code == 503
+    # The widget fetches ICE servers first, so it can explain the refusal before WebRTC starts.
+    assert c.get("/v1/personas/faisal/ice-servers", headers=ORIGIN).status_code == 503
 
 
 def test_rate_limit_per_ip(settings):

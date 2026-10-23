@@ -45,3 +45,14 @@ def test_interruption_clears_busy_state():
     activity.record(InterruptionFrame())
     now[0] = 60
     assert activity.is_idle(60)
+
+
+def test_seconds_until_idle_counts_down_from_last_activity():
+    now = [0.0]
+    activity = ConversationActivity(clock=lambda: now[0])
+    now[0] = 10
+    assert activity.seconds_until_idle(15) == 5
+    now[0] = 20
+    assert activity.seconds_until_idle(15) == 0
+    activity.record(LLMFullResponseStartFrame())
+    assert activity.seconds_until_idle(15) is None

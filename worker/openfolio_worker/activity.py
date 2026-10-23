@@ -63,9 +63,14 @@ class ConversationActivity(BaseObserver):
                 return
         self.last_activity = self._clock()
 
+    def seconds_until_idle(self, seconds: float) -> float | None:
+        """Time left before the call counts as idle; None while someone is speaking or an answer is generating."""
+        if self.bot_speaking or self.generating or self.user_speaking:
+            return None
+        return max(0.0, seconds - (self._clock() - self.last_activity))
+
     def is_idle(self, seconds: float) -> bool:
-        busy = self.bot_speaking or self.generating or self.user_speaking
-        return not busy and self._clock() - self.last_activity >= seconds
+        return self.seconds_until_idle(seconds) == 0
 
     async def on_push_frame(self, data: FramePushed) -> None:
         self.record(data.frame)
