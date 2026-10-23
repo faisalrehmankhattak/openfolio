@@ -36,3 +36,30 @@ def test_normal_questions_pass():
 def test_clean_strips_controls_and_caps_length():
     assert clean("hi​ there\x07  you") == "hi there you"
     assert len(clean("a" * 2000)) == 500
+
+
+def test_spoken_hangup_ends_session_without_forwarding_to_model():
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from pipecat.frames.frames import EndWorkerFrame, TranscriptionFrame
+    from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+    from openfolio_worker.guard import VisitorGuard
+
+    async def check():
+        for phrase in ("End the call.", "please hang up", "Disconnect", "stop this call"):
+            guard = VisitorGuard("Demo", "test")
+            guard.push_frame = AsyncMock()
+            with patch.object(FrameProcessor, "process_frame", new_callable=AsyncMock):
+                await guard.process_frame(TranscriptionFrame(phrase, "visitor", ""), FrameDirection.DOWNSTREAM)
+            frames = [call.args[0] for call in guard.push_frame.call_args_list]
+            assert len(frames) == 2
+            assert frames[0].data["reason"] == "voice_command"
+            assert isinstance(frames[1], EndWorkerFrame)
+        guard = VisitorGuard("Demo", "test")
+        guard.push_frame = AsyncMock()
+        question = TranscriptionFrame("How do you end the call in your product?", "visitor", "")
+        with patch.object(FrameProcessor, "process_frame", new_callable=AsyncMock):
+            await guard.process_frame(question, FrameDirection.DOWNSTREAM)
+        assert guard.push_frame.call_args.args[0] is question
+
+    asyncio.run(check())

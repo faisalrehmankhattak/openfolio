@@ -96,6 +96,10 @@ class VisitorGuard(FrameProcessor):
         await super().process_frame(frame, direction)
 
         if direction == FrameDirection.DOWNSTREAM and isinstance(frame, TranscriptionFrame):
+            if re.fullmatch(r"(?:(?:please|okay|ok)\s+)?(?:end (?:the |this )?call|hang up|disconnect|stop (?:the |this )?call)[.!?]*", clean(frame.text), re.IGNORECASE):
+                await self.push_frame(RTVIServerMessageFrame(data={"type": "openfolio.ended", "reason": "voice_command"}))
+                await self.push_frame(EndWorkerFrame(reason="voice_command"))
+                return
             frame.text = self._screen(frame.text)
             if not frame.text:
                 return

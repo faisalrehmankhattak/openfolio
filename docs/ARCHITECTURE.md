@@ -36,7 +36,7 @@ The server never renders video. It sends the voice; the visitor's device draws a
 - **Shared Kokoro model.** Pipecat loads the Kokoro model (about 300 MB) in every service constructor. The worker loads it once per process and warms it at startup.
 - **Lip-sync in the browser from audio (HeadAudio)**, not from TTS timestamps, so every voice provider works the same way. ElevenLabs word timings can make it sharper later.
 - **Cards slide up as a sheet** capped at 60% of the panel, so the face stays visible on phones.
-- **Placeholder avatar is CC0** (MakeHuman via TalkingHead), textures compressed to WebP: 37 MB → 18 MB, rig and 66 blendshapes intact.
+- **Male demo avatar.** The official Visage male sample is pinned and checksum-verified in development and Docker; its upstream MIT notice is included. Native ARKit shapes are mixed into approximate speech visemes when Oculus shapes are absent.
 
 ## Safeguards
 

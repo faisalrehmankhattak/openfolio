@@ -15,6 +15,7 @@ import asyncio
 import os
 import time
 import uuid
+from pathlib import Path
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 
@@ -36,6 +37,7 @@ from .bot import run_conversation
 from .doctor import run_checks
 from .config import ROOT, Settings, load_settings
 from .persona import Persona, load_personas
+from .ice import browser_ice_servers
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -114,7 +116,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def healthz():
         problems = settings.check()
         ok = not problems and all(c["ok"] for c in checks.values())
-        return {"ok": ok, "active_sessions": len(active), "config_problems": problems, "checks": checks}
+        return JSONResponse(
+            {"ok": ok, "active_sessions": len(active), "config_problems": problems, "checks": checks},
+            status_code=200 if ok else 503,
+        )
+
+    @app.get("/livez")
+    async def livez():
+        return {"ok": True}
+
+    @app.get("/v1/personas/{persona_id}/ice-servers")
+    async def ice_servers(persona_id: str, request: Request):
+        persona = get_persona(persona_id)
+        check_origin(request, persona)
+        if not allow_new_call("ice:" + client_ip(request)):
+            raise HTTPException(429, "Too many ICE configuration requests")
+        return JSONResponse({"iceServers": browser_ice_servers(settings)},
+                            headers={"Cache-Control": "no-store"})
 
     @app.get("/v1/personas/{persona_id}")
     async def persona_info(persona_id: str):
@@ -156,6 +174,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
             active[session_id] = asyncio.create_task(run())
 
+        # Refresh TURN REST credentials for every connection, including long-lived servers.
+        relay = [s for s in browser_ice_servers(settings) if "credential" in s]
+        if settings.turn_server_urls:
+            relay = [{**s, "urls": settings.turn_server_urls} for s in relay]
+        handler.update_ice_servers([IceServer(**s) for s in settings.ice_servers + relay] or None)
         return await handler.handle_web_request(
             request=webrtc_request, webrtc_connection_callback=on_connection
         )
@@ -203,8 +226,8 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=7860)
     args = parser.parse_args()
     # Keep a log file next to the code so problems can be read after the fact.
-    log_dir = ROOT / "data"
-    log_dir.mkdir(exist_ok=True)
+    log_dir = Path(os.getenv("LOG_DIR", ROOT / "data"))
+    log_dir.mkdir(parents=True, exist_ok=True)
     logger.add(log_dir / "worker.log", level="INFO", rotation="5 MB", retention=3, enqueue=True)
     uvicorn.run(create_app(), host=args.host, port=args.port)
 

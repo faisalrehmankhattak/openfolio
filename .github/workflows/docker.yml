@@ -1,0 +1,23 @@
+name: Docker clean-clone checks
+on:
+  push:
+  pull_request:
+jobs:
+  docker:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: cp .env.example .env
+      - run: uv sync --project worker --group dev --frozen
+      - run: uv run --project worker --group dev pytest worker/tests -q
+      - run: docker compose config --quiet
+      - run: docker build -t openfolio:local .
+      - run: ./scripts/docker-smoke.sh
+      - run: ./scripts/docker-webrtc-smoke.sh

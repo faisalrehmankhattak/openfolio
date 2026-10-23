@@ -28,7 +28,7 @@ export function renderCard(card: string, data: any, firstName: string): Card | n
               h("div", { class: "title" }, p.name),
               p.metric ? h("div", { class: "result" }, p.metric) : null,
               h("p", {}, p.summary),
-              ext("Open project", p.url),
+              ext("Tell me more about it", p.url),
             ),
           ),
         ),

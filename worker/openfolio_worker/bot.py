@@ -36,9 +36,11 @@ from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
 from .config import Settings, llm_extra_params
+from .activity import ConversationActivity
+from .cards import PortfolioCards
 from .persona import Persona, build_system_prompt
 from .guard import VisitorGuard
-from .tools import ALL_TOOLS, SessionResources
+from .tools import leave_message, SessionResources
 
 
 def make_stt(s: Settings):
@@ -132,7 +134,7 @@ async def run_conversation(
     llm = make_llm(settings, persona)
     tts = make_tts(settings, persona)
 
-    context = LLMContext(tools=ALL_TOOLS)
+    context = LLMContext(tools=[leave_message])
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
@@ -143,6 +145,7 @@ async def run_conversation(
             transport.input(),
             stt,
             VisitorGuard(persona.first_name, session_id),
+            PortfolioCards(persona),
             user_aggregator,
             llm,
             tts,
@@ -151,8 +154,10 @@ async def run_conversation(
         ]
     )
 
+    activity = ConversationActivity()
     worker = PipelineWorker(
         pipeline,
+        observers=[activity],
         params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
         app_resources=SessionResources(
             persona=persona, inbox_dir=settings.inbox_dir, session_id=session_id
@@ -188,6 +193,8 @@ async def run_conversation(
 
     @worker.event_handler("on_idle_timeout")
     async def on_idle_timeout(worker):
+        if not activity.is_idle(persona.idle_seconds):
+            return
         logger.info(f"[{session_id}] no activity for {persona.idle_seconds}s; hanging up")
         await worker.queue_frames([RTVIServerMessageFrame(data={"type": "openfolio.ended", "reason": "idle"})])
         await asyncio.sleep(0.5)  # let the message reach the browser

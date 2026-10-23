@@ -18,13 +18,60 @@ Working end to end and tested in a headless browser:
 - **Cards.** The persona calls tools (`show_projects`, `show_experience`, `show_skills`, `show_contact`, `leave_message`) and the widget shows matching cards in the chat.
 - **Guardrails.** Prompt-injection screening, portfolio-only answers, hang-up after 60 seconds of quiet, per-IP call limits, allowed origins, turn and length caps, an "AI version" badge and a first-line disclosure. See [Safeguards](docs/ARCHITECTURE.md#safeguards).
 - **Text first.** Typing or tapping a suggestion starts a conversation without asking for the microphone; the mic button adds voice any time.
-- **No third-party calls from the browser.** The widget talks only to your server.
+- **Provider keys stay server-side.** The widget uses your server for AI requests. WebRTC may contact configured STUN/TURN servers for connectivity.
 
 Not built yet: photo-to-3D (LAM), the owner studio, accounts and billing. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-The current face is a **placeholder**: a CC0 MakeHuman model from the TalkingHead project. It is replaced by a head built from the owner's selfie in the next milestone.
+The current face is a **placeholder**: the male Ready Player Me sample from the TalkingHead project. It is replaced by a head built from the owner's selfie in the next milestone.
 
-## Run it on your Mac
+## Run with Docker (recommended)
+
+You need Docker Engine + Compose, or Docker Desktop. No local Node.js or Python
+installation is required. Clone this repository, then:
+
+```sh
+cp .env.example .env
+# Edit .env: add DEEPGRAM_API_KEY, LLM_API_KEY, and LLM_MODEL.
+docker compose up --build
+```
+
+Open http://localhost:7860. The image builds the widget and downloads a pinned,
+checksum-verified male avatar automatically. Your `.env` is passed at runtime and
+is excluded from the image. Startup validates the providers; small checks can
+incur provider usage. Kokoro (default) downloads voice weights on first use;
+allow several minutes. To use cloud voice instead, set `TTS_PROVIDER=elevenlabs`
+and fill in the ElevenLabs key and voice ID. Use the same configuration for
+local and hosted instances; your keys stay on the server.
+
+```sh
+docker compose up --build -d     # run in the background
+docker compose logs -f          # provider checks and startup progress
+docker compose down            # stop, preserving saved messages and model cache
+```
+
+The persona folder is mounted read-only. Edit `personas/faisal.json` to customize
+the supplied demo and restart the service. Add another persona file to serve
+another embed ID. The bundled demo uses `faisal` as an example persona; change the script tag's
+`data-persona` to your own ID. The demo is a neutral embed test page, not a
+personal portfolio. Add the script to your existing portfolio to use the widget. Logs and inbox messages persist in `openfolio-data`;
+voice/model caches persist in `openfolio-cache`. Do not use `down -v` unless you
+intend to delete those volumes.
+
+**Voice connectivity:** the default Compose file exposes HTTP on loopback. WebRTC
+uses a separate media path; loading the page alone does not validate a call.
+The default setup includes a TURN relay bound to localhost so browser audio can
+cross Docker's network boundary. Its fixed development secret is local-only;
+it is disabled by the public-hosting override. The Linux hosting recipe and TURN
+configuration are in [Docker hosting](docs/DOCKER.md). HTTPS is required for
+microphone access outside localhost. This is a CPU-only image; start with 4 GB
+RAM and measure your workload before increasing `MAX_SESSIONS`.
+
+`GET /livez` reports HTTP process liveness; `GET /healthz` returns 503 when
+configuration/provider checks fail. A healthy provider check does not prove
+WebRTC media connectivity. First builds need internet access for dependencies
+and the avatar; first local voice startup also downloads its weights.
+
+## Run it on your Mac without Docker
 
 You need [uv](https://docs.astral.sh/uv/) and Node.js 22.12+ (only to rebuild the widget; the server itself needs no Node).
 
@@ -80,12 +127,22 @@ Copy `personas/faisal.json` to `personas/<id>.json` and edit it. Everything the 
 embed/      the widget (TypeScript, Vite): loader.ts -> embed.js, app.ts -> app.js
 worker/     the voice server (Python, Pipecat, FastAPI)
 personas/   one JSON profile per persona
-avatars/    avatar files (not committed; scripts/fetch-demo-avatar.sh gets the placeholder)
+avatars/    custom avatars; Docker automatically fetches the pinned male placeholder
 demo/       a test page served at /
 docs/       architecture and decisions
 ```
 
 ## Tests
+
+Build and smoke-test the installed container without API calls:
+
+```sh
+docker build -t openfolio:local .
+./scripts/docker-smoke.sh openfolio:local
+# After installing worker dev dependencies, test real ICE + synthetic audio:
+./scripts/docker-webrtc-smoke.sh
+```
+
 
 ```sh
 cd worker && uv run --group dev pytest
@@ -94,4 +151,4 @@ cd embed && npm run typecheck
 
 ## Licenses
 
-Openfolio's code is Apache-2.0. Dependencies keep their own licenses: Pipecat (BSD-2), TalkingHead and HeadAudio (MIT), three.js (MIT), Kokoro (Apache-2.0). The placeholder avatar is CC0.
+Openfolio's code is Apache-2.0. Dependencies keep their own licenses: Pipecat (BSD-2), TalkingHead and HeadAudio (MIT), three.js (MIT), Kokoro (Apache-2.0). The male placeholder is the official Visage sample; its upstream MIT license is included in `avatars/LICENSE-readyplayerme.txt`.

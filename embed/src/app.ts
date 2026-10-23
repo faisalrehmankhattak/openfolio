@@ -15,6 +15,7 @@ import { h } from "./dom";
 import { icon } from "./icons";
 import { LocalMediaManager } from "./media";
 import { PANEL_CSS } from "./styles";
+import { ARKIT_VISEME_FALLBACKS } from "./visemes";
 
 export type MountOptions = {
   persona: string;
@@ -34,8 +35,8 @@ type PersonaInfo = {
   quick_questions: { label: string; question: string }[];
 };
 
-type Head = { audioCtx: AudioContext; audioAnalyzerNode: AudioNode; start(): void; stop(): void };
-type CallState = "idle" | "connecting" | "listening" | "thinking" | "speaking";
+type Head = { audioCtx: AudioContext; audioAnalyzerNode: AudioNode; audioSpeechGainNode: GainNode; start(): void; stop(): void };
+type CallState = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "ready";
 
 // Head-and-shoulders framing for a tall portrait panel (TalkingHead "upper" view).
 const CAMERA = { y: 0.1, distance: -0.6 };
@@ -58,6 +59,8 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     return;
   }
   const first = info.first_name;
+  let chatOpen = false;
+  let textOnly = false;
   const showDetails = isLocal(opts.server) || isLocal(location.href);
 
   // ---- layout -------------------------------------------------------------
@@ -66,7 +69,6 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   const subText = h("span", { class: "text" }, info.title);
   const subDot = h("span", { class: "dot", hidden: true });
   const sub = h("div", { class: "sub" }, subDot, subText);
-  const transcriptBtn = h("button", { class: "iconbtn", type: "button", "aria-label": "Show transcript" }, icon("transcript"));
   const closeBtn = h("button", { class: "iconbtn", type: "button", "aria-label": "Close" }, icon("close"));
   const top = h(
     "div",
@@ -77,7 +79,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
       h("div", { class: "name" }, info.name),
       h("span", { class: "ai", title: `This is an AI version of ${first}, answering from ${first}'s portfolio` }, "AI"),
       h("span", { class: "spacer" }),
-      transcriptBtn,
+
       opts.mode === "bubble" ? closeBtn : null,
     ),
     sub,
@@ -104,34 +106,60 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     return { el, title, body };
   }
   const cardSheet = makeSheet("Card");
-  const logSheet = makeSheet("Transcript");
+  const logSheet = makeSheet("Chat");
+  logSheet.el.className = "chat-pane";
+  logSheet.body.setAttribute("role", "log");
+  logSheet.body.setAttribute("aria-live", "polite");
+  const chatClose = logSheet.el.querySelector("button")!;
+  chatClose.setAttribute("aria-label", "Close chat");
+  chatClose.addEventListener("click", () => setChat(false));
 
   const startBtn = h("button", { class: "start", type: "button" }, icon("mic"), h("span", {}, `Talk to ${first}`));
   const micBtn = h("button", { class: "mic", type: "button", hidden: true, "aria-label": "Mute microphone" }, h("span", { class: "ring" }), icon("mic"));
-  const typeBtn = h("button", { class: "side", type: "button", "aria-label": "Type a question" }, icon("keyboard"));
   const endBtn = h("button", { class: "side end", type: "button", "aria-label": "End call", hidden: true }, icon("end"));
+  const chatEndBtn = h("button", { class: "chat-end", type: "button", hidden: true }, "End session");
+  chatEndBtn.addEventListener("click", () => void hangUp());
+  const voiceSwitch = h("button", { class: "side voice-switch", type: "button", "aria-label": "Switch to voice", title: "Switch to voice" }, icon("mic"));
+  voiceSwitch.addEventListener("click", () => { setChat(false); (startBtn.hidden ? micBtn : startBtn).focus(); });
+  const chatSwitch = h("button", { class: "side", type: "button", "aria-label": "Switch to chat", title: "Switch to chat" }, icon("keyboard"));
+  chatSwitch.addEventListener("click", () => setChat(true));
   const input = h("input", { type: "text", placeholder: `Ask ${first} anything`, "aria-label": "Your question", maxlength: "500", enterkeyhint: "send" });
   const sendBtn = h("button", { class: "side send", type: "submit", "aria-label": "Send" }, icon("send"));
-  const backBtn = h("button", { class: "side", type: "button", "aria-label": "Back to voice" }, icon("mic"));
   const typeRow = h(
     "form",
     { class: "typebar", hidden: true, onsubmit: (e: Event) => { e.preventDefault(); void ask(input.value); } },
-    backBtn,
+    voiceSwitch,
     input,
     sendBtn,
   );
   const controls = h(
     "div",
     { class: "controls" },
-    h("div", { class: "left" }, typeBtn),
+    h("div", { class: "left" }, chatSwitch),
     h("div", { class: "center" }, startBtn, micBtn),
     h("div", { class: "right" }, endBtn),
   );
   const foot = h("div", { class: "foot" }, `AI version of ${first}. It can make mistakes.`);
-  const bar = h("div", { class: "bar" }, controls, typeRow, foot);
+  const bar = h("div", { class: "bar" }, controls, foot);
 
   const lower = h("div", { class: "lower" }, notice, captions, suggest);
-  panel.append(headEl, loading, top, lower, cardSheet.el, logSheet.el, bar);
+  logSheet.el.querySelector(".sheet-head")!.remove();
+  logSheet.el.append(typeRow, chatEndBtn);
+  panel.append(headEl, loading, top, lower, logSheet.el, bar);
+
+  function setChat(open: boolean, typing = true, focusInput = true) {
+    chatOpen = open;
+    if (open) logSheet.el.prepend(notice); else lower.prepend(notice);
+    if (open && typing) { textOnly = true; updateAudioMode(); }
+    panel.classList.toggle("chat-open", open);
+    typeRow.hidden = !open;
+    if (open) {
+      if (typing && client && !muted) { muted = true; client.enableMic(false); setMicLook(); }
+      if (state === "listening" || state === "ready") setState("ready");
+      if (focusInput) input.focus();
+    }
+    if (state === "ready") setState("ready");
+  }
 
   // ---- transcript + captions ---------------------------------------------
   type Turn = { el: HTMLElement; segments: Map<string, string> };
@@ -200,6 +228,11 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   function userSaid(text: string, final: boolean) {
     capUser.textContent = text;
     if (final) {
+      if (!muted && /^(?:(?:please|okay|ok)\s+)?(?:end (?:the |this )?call|hang up|disconnect|stop (?:the |this )?call)[.!?]*$/i.test(text.trim())) {
+        logLine(`You: ${text}`, "user");
+        void hangUp();
+        return;
+      }
       logLine(`You: ${text}`, "user");
       botTurn = null;
     }
@@ -207,6 +240,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   // Pipecat reports each sentence several times (queued, then spoken) under one
   // segment id; keep one entry per segment and show the latest sentences.
   function botSaid(text: string, segmentId?: string | number) {
+    if (streaming) return;
     if (!botTurn) botTurn = { el: logLine("", "bot"), segments: new Map() };
     botTurn.segments.set(segmentId === undefined ? `t:${text}` : `s:${segmentId}`, text);
     const sentences = [...botTurn.segments.values()];
@@ -227,6 +261,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   function streamStart() {
     streaming = false;
     streamBuf = "";
+    botTurn = null;
     replay(capBot, "in");
   }
   function replay(el: HTMLElement, cls: string) {
@@ -237,6 +272,9 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   function streamText(chunk: string) {
     streaming = true;
     streamBuf += chunk;
+    if (!botTurn) botTurn = { el: logLine("", "bot"), segments: new Map() };
+    botTurn.el.textContent = `${first}: ${streamBuf}`;
+    logSheet.body.scrollTop = logSheet.body.scrollHeight;
     // Keep the caption to the last two sentences so it never grows past three lines.
     const parts = streamBuf.trim().split(/(?<=[.!?])\s+/);
     setCaption(parts.slice(-2).join(" "));
@@ -245,15 +283,9 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   function showCard(card: string, data: unknown) {
     const c = renderCard(card, data, first);
     if (!c) return;
-    cardSheet.title.textContent = c.title;
-    cardSheet.body.replaceChildren(c.body);
-    logSheet.el.classList.remove("open");
-    cardSheet.el.classList.add("open");
+    logSheet.body.append(h("section", { class: "chat-card" }, h("h3", {}, c.title), c.body));
+    logSheet.body.scrollTop = logSheet.body.scrollHeight;
   }
-  transcriptBtn.addEventListener("click", () => {
-    cardSheet.el.classList.remove("open");
-    logSheet.el.classList.toggle("open");
-  });
 
   // ---- face ---------------------------------------------------------------
   let head: Head | null = null;
@@ -287,6 +319,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
       mixerGainSpeech: 3,
       avatarMood: "neutral",
     });
+    th.mtExtras.push(...ARKIT_VISEME_FALLBACKS);
     const avatarUrl = new URL(info.avatar.url, `${opts.server}/`).href;
     await th.showAvatar({ url: avatarUrl, body: info.avatar.body || "M", avatarMood: "neutral", lipsyncLang: "en" }, (ev: ProgressEvent) => {
       if (ev.lengthComputable) loading.textContent = `Getting ready ${Math.round((ev.loaded / ev.total) * 100)}%`;
@@ -311,16 +344,19 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     });
     if (showDetails) (window as any).__openfolioHead = th; // for tuning the camera in development
     head = th as Head;
+    updateAudioMode();
     return head;
   }
 
   // ---- call state ---------------------------------------------------------
   let state: CallState = "idle";
   function setState(next: CallState) {
+    if ((next === "listening" && muted) || (next === "speaking" && textOnly)) next = "ready";
     state = next;
     const live = next !== "idle" && next !== "connecting";
     const words: Record<CallState, string> = {
       idle: info.title,
+      ready: chatOpen ? "Chat ready" : "Microphone off",
       connecting: "Connecting",
       listening: "Listening",
       thinking: "Thinking",
@@ -329,11 +365,12 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     sub.className = `sub${live ? " live" : ""}${next === "speaking" ? " speaking" : ""}`;
     subDot.hidden = !live;
     subText.textContent = words[next];
-    startBtn.hidden = next !== "idle" && next !== "connecting";
+    startBtn.hidden = live && !(muted && !chatOpen);
     startBtn.disabled = next === "connecting";
-    (startBtn.lastChild as HTMLElement).textContent = next === "connecting" ? "Connecting" : `Talk to ${first}`;
-    micBtn.hidden = !live;
+    (startBtn.lastChild as HTMLElement).textContent = next === "connecting" ? "Connecting" : live && muted ? "Resume voice" : `Talk to ${first}`;
+    micBtn.hidden = !live || (muted && !chatOpen);
     endBtn.hidden = !live;
+    chatEndBtn.hidden = !live;
     // Chips stay in place for the whole call so the captions never jump.
     suggest.querySelectorAll("button").forEach((b) => ((b as HTMLButtonElement).disabled = next === "connecting"));
   }
@@ -362,6 +399,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
 
   // ---- conversation -------------------------------------------------------
   let client: PipecatClient | null = null;
+  let connectionGeneration = 0;
   let connecting: Promise<void> | null = null;
   let playEl: HTMLAudioElement | null = null;
   let botStream: MediaStream | null = null;
@@ -371,12 +409,17 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
 
   // The voice plays through the face (which lip-syncs it) when the face is
   // ready, and through a plain audio element until then.
+  function updateAudioMode() {
+    if (head) head.audioSpeechGainNode.gain.value = textOnly ? 0 : 3;
+    if (playEl) playEl.muted = onFace || textOnly;
+  }
   function routeBotAudio(stream: MediaStream) {
     botStream = stream;
     onFace = false;
     playEl = new Audio();
     playEl.srcObject = stream;
     playEl.autoplay = true;
+    updateAudioMode();
     if (head && head.audioCtx.state === "running") moveAudioToFace(head);
   }
   function moveAudioToFace(face: Head) {
@@ -401,6 +444,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   async function connect(withMic: boolean) {
     if (client) return;
     if (connecting) return connecting;
+    const generation = connectionGeneration;
     connecting = (async () => {
       setState("connecting");
       endedReason = "";
@@ -412,7 +456,17 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
       }
       // Our own media manager: the default one loads a script from Daily's CDN.
       const media = new LocalMediaManager();
-      const transport = new SmallWebRTCTransport({ mediaManager: media as any });
+      let iceServers: RTCIceServer[];
+      try {
+        const iceResponse = await fetch(`${opts.server}/v1/personas/${encodeURIComponent(opts.persona)}/ice-servers`);
+        if (!iceResponse.ok) throw new Error(`ICE configuration ${iceResponse.status}`);
+        ({ iceServers } = await iceResponse.json());
+      } catch {
+        setState("idle");
+        showNotice("Couldn't connect", "Couldn't load connection settings. Try again in a moment.");
+        return;
+      }
+      const transport = new SmallWebRTCTransport({ mediaManager: media as any, iceServers });
       // A call started by typing has no mic; turning it on later swaps it in.
       media.onLocalTrack = (track) => (transport as any).getAudioTransceiver?.()?.sender?.replaceTrack(track);
       muted = !withMic;
@@ -421,6 +475,12 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
         enableMic: withMic,
         enableCam: false,
         callbacks: {
+          onDeviceError: () => {
+            muted = true;
+            setMicLook();
+            setState(client ? "ready" : "idle");
+            showNotice("Microphone unavailable", "Allow microphone access to talk, or switch to Chat to type.");
+          },
           onTrackStarted: (track, participant) => {
             if (track.kind !== "audio") return;
             if (participant?.local) return watchMicLevel(track);
@@ -429,9 +489,10 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
           onUserStartedSpeaking: () => setState("listening"),
           onUserStoppedSpeaking: () => setState("thinking"),
           onBotStartedSpeaking: () => setState("speaking"),
-          onBotStoppedSpeaking: () => setState("listening"),
+          onBotStoppedSpeaking: () => setState(muted ? "ready" : "listening"),
           onBotLlmStarted: () => streamStart(),
-          onLlmRawText: (d: any) => { if (d?.text) streamText(d.text); },
+          onBotLlmStopped: () => { if (muted) setState("ready"); },
+          onBotLlmText: (d: any) => { if (d?.text) streamText(d.text); },
           onUserTranscript: (d) => { if (d.text.trim()) userSaid(d.text.trim(), d.final); },
           onBotOutput: (d) => {
             const kind = d.text_type ?? d.aggregated_by;
@@ -449,12 +510,13 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
             console.warn("[openfolio]", e);
             // Timing warnings from the voice are not worth interrupting anyone.
             const serious = e?.data?.fatal || /completion|model|api key|auth|quota|rate limit|denied|invalid|reasoning/i.test(raw);
-            if (showDetails) logLine(`Error: ${raw}`, "note");
+            if (showDetails && serious) logLine(`Error: ${raw}`, "note");
             if (!serious) return;
             const { title, body } = explain(raw);
             showNotice(title, showDetails ? body : "Something went wrong on our side. Try again in a moment.", showDetails ? raw : undefined, true);
           },
           onDisconnected: () => {
+            if (generation !== connectionGeneration) return;
             const reason = endedReason;
             teardown();
             if (reason === "idle") showHint("The call ended because it went quiet. Ask anything to start again.");
@@ -466,10 +528,13 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
       });
       try {
         await c.connect({ webrtcRequestParams: { endpoint: `${opts.server}/v1/personas/${encodeURIComponent(opts.persona)}/offer` } });
+        if (generation !== connectionGeneration) { await c.disconnect(); return; }
         client = c;
+        if (chatOpen) { muted = true; textOnly = true; c.enableMic(false); updateAudioMode(); }
         setMicLook();
         setState("listening");
       } catch (err: any) {
+        if (generation !== connectionGeneration) { try { await c.disconnect(); } catch {} return; }
         console.error("[openfolio]", err);
         const msg = String(err?.message || err || "");
         setState("idle");
@@ -482,7 +547,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
         connecting = null;
       }
     })();
-    return connecting;
+    try { await connecting; } finally { connecting = null; }
   }
 
   function setMicLook() {
@@ -492,6 +557,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   }
 
   function teardown() {
+    connectionGeneration++;
     client = null;
     levelStop?.();
     levelStop = null;
@@ -513,6 +579,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   async function ask(text: string) {
     const q = text.trim();
     if (!q) return;
+    setChat(true);
     lastQuestion = q;
     hideNotice();
     input.value = "";
@@ -521,24 +588,29 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     if (!client) await connect(false);
     if (!client) return;
     setState("thinking");
-    await client.sendText(q, { run_immediately: true, audio_response: true });
+    try {
+      await client.sendText(q, { run_immediately: true, audio_response: !chatOpen });
+    } catch {
+      setState(client ? "ready" : "idle");
+      showNotice("Message wasn't sent", "Check your connection and try again.", undefined, true);
+    }
   }
 
   // ---- controls -----------------------------------------------------------
-  startBtn.addEventListener("click", () => { hideNotice(); void connect(true); });
+  startBtn.addEventListener("click", () => {
+    hideNotice();
+    textOnly = false; updateAudioMode();
+    if (client) { muted = false; client.enableMic(true); setMicLook(); setState("listening"); }
+    else void connect(true);
+  });
   endBtn.addEventListener("click", () => void hangUp());
   micBtn.addEventListener("click", () => {
     muted = !muted;
+    if (!muted) { textOnly = false; updateAudioMode(); }
     client?.enableMic(!muted);
     setMicLook();
+    setState(muted ? "ready" : "listening");
   });
-  typeBtn.disabled = false;
-  typeBtn.addEventListener("click", () => {
-    typeRow.hidden = false;
-    controls.hidden = true;
-    input.focus();
-  });
-  backBtn.addEventListener("click", () => { typeRow.hidden = true; controls.hidden = false; });
   closeBtn.addEventListener("click", async () => {
     await hangUp();
     head?.stop();

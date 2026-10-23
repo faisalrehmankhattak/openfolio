@@ -1,0 +1,46 @@
+name: openfolio
+services:
+  openfolio:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: "7860"
+      OPENFOLIO_ROOT: /app
+      TURN_URLS: ${TURN_URLS:-turn:127.0.0.1:3478?transport=tcp}
+      TURN_SERVER_URLS: ${TURN_SERVER_URLS:-turn:turn:3478?transport=tcp}
+      TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:-openfolio-local-only}
+    depends_on:
+      - turn
+    ports:
+      - "127.0.0.1:${OPENFOLIO_PORT:-7860}:7860"
+    volumes:
+      - ./personas:/app/personas:ro
+      - openfolio-data:/app/data
+      - openfolio-cache:/home/openfolio/.cache
+    stop_grace_period: 30s
+  # Local relay only: all listeners are bound to host loopback.
+  turn:
+    image: coturn/coturn:4.6.3-alpine
+    restart: unless-stopped
+    command:
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+      - --fingerprint
+      - --use-auth-secret
+      - --static-auth-secret=openfolio-local-only
+      - --realm=openfolio-local
+      - --external-ip=127.0.0.1
+      - --relay-ip=0.0.0.0
+      - --allow-loopback-peers
+      - --min-port=49160
+      - --max-port=49200
+      - --log-file=stdout
+    ports:
+      - "127.0.0.1:3478:3478/tcp"
+      - "127.0.0.1:3478:3478/udp"
+      - "127.0.0.1:49160-49200:49160-49200/udp"
+volumes:
+  openfolio-data:
+  openfolio-cache:

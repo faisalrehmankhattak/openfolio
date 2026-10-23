@@ -1,8 +1,7 @@
-"""Tools the persona can call. Each one puts a card on the visitor's screen.
+"""Tools the persona can call. Each one puts a card in the visitor's Chat tab.
 
 A tool pushes an RTVI server message that the widget renders as a card, then
-returns a short result so the model knows the card is showing and can talk
-about it instead of reading it out.
+returns a short result so the model knows the details are saved in Chat and can answer conversationally.
 """
 
 from __future__ import annotations
@@ -41,26 +40,26 @@ async def _show(params: FunctionCallParams, card: str, data: dict) -> None:
 
 
 async def show_projects(params: FunctionCallParams):
-    """Show the owner's projects on screen as cards. Use when the visitor asks about projects or work."""
+    """Show the owner's projects as cards in the Chat tab. Use when the visitor asks about projects or work."""
     res: SessionResources = params.app_resources
     projects = [p.model_dump() for p in res.persona.projects]
     await _show(params, "projects", {"projects": projects})
-    await params.result_callback({"shown": [p["name"] for p in projects]})
+    await params.result_callback({"location": "Chat tab", "shown": [p["name"] for p in projects]})
 
 
 async def show_experience(params: FunctionCallParams):
-    """Show the owner's work history on screen. Use for questions about experience, roles or the resume."""
+    """Show the owner's work history in the Chat tab. Use for questions about experience, roles or the resume."""
     res: SessionResources = params.app_resources
     roles = [r.model_dump() for r in res.persona.experience]
     await _show(params, "experience", {"roles": roles, "education": res.persona.education})
-    await params.result_callback({"shown": len(roles)})
+    await params.result_callback({"location": "Chat tab", "shown": len(roles)})
 
 
 async def show_skills(params: FunctionCallParams):
-    """Show the owner's skills on screen, grouped by area."""
+    """Show the owner's skills in the Chat tab, grouped by area."""
     res: SessionResources = params.app_resources
     await _show(params, "skills", {"skills": res.persona.skills})
-    await params.result_callback({"shown": list(res.persona.skills)})
+    await params.result_callback({"location": "Chat tab", "shown": list(res.persona.skills)})
 
 
 async def show_contact(params: FunctionCallParams):
@@ -72,7 +71,7 @@ async def show_contact(params: FunctionCallParams):
         "booking_url": str(p.booking_url) if p.booking_url else None,
     }
     await _show(params, "contact", data)
-    await params.result_callback({"shown": True, "can_book": bool(p.booking_url)})
+    await params.result_callback({"location": "Chat tab", "shown": True, "can_book": bool(p.booking_url)})
 
 
 async def leave_message(

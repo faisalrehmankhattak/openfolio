@@ -1,0 +1,15 @@
+# Developer/CI overlay: synthetic audio and an echo handler; no AI providers.
+services:
+  openfolio:
+    image: openfolio:local
+    env_file: !reset []
+    environment:
+      TURN_URLS: turn:127.0.0.1:3478?transport=tcp
+      TURN_SERVER_URLS: turn:turn:3478?transport=tcp
+      TURN_SHARED_SECRET: openfolio-local-only
+    entrypoint: /app/worker/.venv/bin/python
+    command: [/tmp/rtc.py, server]
+    ports: !override
+      - "127.0.0.1:17862:7860"
+    volumes:
+      - ./scripts/rtc-smoke.py:/tmp/rtc.py:ro

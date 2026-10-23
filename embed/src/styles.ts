@@ -187,4 +187,25 @@ export const PANEL_CSS = `
 .empty { color: var(--muted); font-size: 14px; }
 
 button:focus-visible, a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* One compact panel with explicit voice and chat modes. */
+.chat-pane { display: none; }
+.chat-open .head, .chat-open .loading, .chat-open .lower, .chat-open .bar { visibility: hidden; }
+.chat-open .top { background: var(--paper); padding-bottom: 12px; }
+.chat-open .chat-pane { position: absolute; inset: 88px 0 0; display: flex; flex-direction: column; background: var(--paper); }
+.chat-pane .sheet-body { flex: 1; min-height: 0; padding: 16px; overflow-wrap: anywhere; }
+.chat-pane .notice { flex: none; margin-top: 8px; }
+.chat-pane .typebar { position: static; flex: none; margin: 12px; padding: 3px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.chat-pane .typebar input { background: none; padding: 0 6px; }
+.chat-pane .typebar .side { flex: none; width: 42px; height: 42px; }
+.chat-pane .typebar:focus-within { outline: 2px solid var(--ink); }
+.chat-pane .typebar input:focus { outline: none; }
+.chat-end { align-self: center; border: 0; background: none; color: var(--danger) !important; padding: 0 16px 14px; font-size: 12px !important; cursor: pointer; }
+.chat-pane .line { padding: 12px 14px; border-radius: 14px; background: var(--mist-1); white-space: pre-wrap; }
+.chat-pane .line.user { margin-left: 24px; background: var(--accent); color: white; }
+.chat-pane .line.note { background: none; }
+.chat-card { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin: 12px 0; }
+.chat-card h3 { margin: 0 0 12px; font-size: 15px; }
+.chat-card .rail { display: grid; margin: 0; padding: 0; gap: 10px; }
+.chat-card .proj { min-height: auto; }
 `;

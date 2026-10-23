@@ -1,0 +1,27 @@
+# Linux VM hosting. Requires Docker Compose >= 2.24.4 for !reset.
+# Set OPENFOLIO_DOMAIN and DEV_ORIGINS in .env before starting.
+services:
+  openfolio:
+    network_mode: host
+    ports: !reset []
+    depends_on: !reset []
+    environment:
+      TRUST_PROXY: "1"
+      TURN_URLS: ${TURN_URLS:-}
+      TURN_SERVER_URLS: ${TURN_SERVER_URLS:-}
+      TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:-}
+  turn:
+    profiles: [local-turn]
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      OPENFOLIO_DOMAIN: ${OPENFOLIO_DOMAIN:?Set OPENFOLIO_DOMAIN in .env for HTTPS hosting}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+volumes:
+  caddy-data:
+  caddy-config:

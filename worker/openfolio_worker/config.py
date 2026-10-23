@@ -10,7 +10,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parents[2]  # the repo root
+ROOT = Path(os.getenv("OPENFOLIO_ROOT", Path(__file__).resolve().parents[2]))
 
 
 def _list(name: str) -> list[str]:
@@ -40,6 +40,9 @@ class Settings:
     ice_servers: list[dict] = field(default_factory=list)
     dev_origins: list[str] = field(default_factory=list)
     max_sessions: int = 4
+    turn_urls: list[str] = field(default_factory=list)
+    turn_shared_secret: str | None = None
+    turn_server_urls: list[str] = field(default_factory=list)
 
     def check(self) -> list[str]:
         """Return problems that would stop a call from working."""
@@ -95,4 +98,7 @@ def load_settings() -> Settings:
         ice_servers=ice,
         dev_origins=_list("DEV_ORIGINS") or ["http://localhost:4173", "http://127.0.0.1:4173", "http://localhost:7860", "http://127.0.0.1:7860"],
         max_sessions=int(os.getenv("MAX_SESSIONS", "4")),
+        turn_urls=_list("TURN_URLS"),
+        turn_server_urls=_list("TURN_SERVER_URLS"),
+        turn_shared_secret=os.getenv("TURN_SHARED_SECRET") or None,
     )

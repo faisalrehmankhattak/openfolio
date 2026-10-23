@@ -8,6 +8,8 @@
  * page never pays for what nobody uses.
  */
 
+declare const __OPENFOLIO_BUILD__: string;
+
 type Mode = "bubble" | "inline";
 
 const script = document.currentScript as HTMLScriptElement | null;
@@ -80,7 +82,7 @@ class OpenfolioAgent extends HTMLElement {
     root.append(loading);
     try {
       const base = this.getAttribute("assets") || assetBase;
-      const app = await import(/* @vite-ignore */ `${base}app.js`);
+      const app = await import(/* @vite-ignore */ `${base}app.js?v=${__OPENFOLIO_BUILD__}`);
       loading.remove();
       app.mount(root, {
         persona: this.getAttribute("persona") || "",
