@@ -1,9 +1,13 @@
-from openfolio_worker.activity import ConversationActivity
 from pipecat.frames.frames import (
-    BotStartedSpeakingFrame, BotStoppedSpeakingFrame,
-    LLMFullResponseStartFrame, LLMFullResponseEndFrame,
-    LLMMessagesAppendFrame, InterruptionFrame,
+    BotStartedSpeakingFrame,
+    BotStoppedSpeakingFrame,
+    InterruptionFrame,
+    LLMFullResponseEndFrame,
+    LLMFullResponseStartFrame,
+    LLMMessagesAppendFrame,
 )
+
+from openfolio_worker.activity import ConversationActivity
 
 
 def test_long_speech_does_not_timeout_and_gets_full_idle_window_afterwards():

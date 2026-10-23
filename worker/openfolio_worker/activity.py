@@ -1,47 +1,71 @@
-"""Track real conversation activity so the idle timer never cuts off an answer."""
+"""Tracks real conversation activity so the idle timer never cuts off an answer."""
+
+from __future__ import annotations
+
 import time
+from collections.abc import Callable
+
 from pipecat.frames.frames import (
-    BotStartedSpeakingFrame, BotStoppedSpeakingFrame, BotSpeakingFrame,
-    LLMFullResponseStartFrame, LLMFullResponseEndFrame, LLMTextFrame,
-    TranscriptionFrame, InterimTranscriptionFrame, LLMMessagesAppendFrame,
-    UserStartedSpeakingFrame, UserStoppedSpeakingFrame, UserSpeakingFrame,
+    BotSpeakingFrame,
+    BotStartedSpeakingFrame,
+    BotStoppedSpeakingFrame,
+    Frame,
+    InterimTranscriptionFrame,
     InterruptionFrame,
+    LLMFullResponseEndFrame,
+    LLMFullResponseStartFrame,
+    LLMMessagesAppendFrame,
+    LLMTextFrame,
+    TranscriptionFrame,
+    UserSpeakingFrame,
+    UserStartedSpeakingFrame,
+    UserStoppedSpeakingFrame,
 )
 from pipecat.observers.base_observer import BaseObserver, FramePushed
 
+# Frames that prove someone is still there without changing who is busy.
+ACTIVITY_FRAMES = (
+    BotSpeakingFrame,
+    UserSpeakingFrame,
+    LLMTextFrame,
+    TranscriptionFrame,
+    InterimTranscriptionFrame,
+    LLMMessagesAppendFrame,
+)
+
 
 class ConversationActivity(BaseObserver):
-    def __init__(self, clock=time.monotonic):
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         super().__init__(observe_every_push=False)
-        self.clock = clock
+        self._clock = clock
         self.last_activity = clock()
-        self.speaking = False
+        self.bot_speaking = False
         self.generating = False
         self.user_speaking = False
 
-    def record(self, frame):
-        if isinstance(frame, BotStartedSpeakingFrame):
-            self.speaking = True
-        elif isinstance(frame, BotStoppedSpeakingFrame):
-            self.speaking = False
-        elif isinstance(frame, LLMFullResponseStartFrame):
-            self.generating = True
-        elif isinstance(frame, LLMFullResponseEndFrame):
-            self.generating = False
-        elif isinstance(frame, UserStartedSpeakingFrame):
-            self.user_speaking = True
-        elif isinstance(frame, UserStoppedSpeakingFrame):
-            self.user_speaking = False
-        elif isinstance(frame, InterruptionFrame):
-            self.speaking = self.generating = False
-        elif not isinstance(frame, (BotSpeakingFrame, UserSpeakingFrame, LLMTextFrame,
-                                   TranscriptionFrame, InterimTranscriptionFrame, LLMMessagesAppendFrame)):
-            return
-        self.last_activity = self.clock()
+    def record(self, frame: Frame) -> None:
+        match frame:
+            case BotStartedSpeakingFrame():
+                self.bot_speaking = True
+            case BotStoppedSpeakingFrame():
+                self.bot_speaking = False
+            case LLMFullResponseStartFrame():
+                self.generating = True
+            case LLMFullResponseEndFrame():
+                self.generating = False
+            case UserStartedSpeakingFrame():
+                self.user_speaking = True
+            case UserStoppedSpeakingFrame():
+                self.user_speaking = False
+            case InterruptionFrame():
+                self.bot_speaking = self.generating = False
+            case _ if not isinstance(frame, ACTIVITY_FRAMES):
+                return
+        self.last_activity = self._clock()
 
-    def is_idle(self, seconds):
-        return (not self.speaking and not self.generating and not self.user_speaking
-                and self.clock() - self.last_activity >= seconds)
+    def is_idle(self, seconds: float) -> bool:
+        busy = self.bot_speaking or self.generating or self.user_speaking
+        return not busy and self._clock() - self.last_activity >= seconds
 
-    async def on_push_frame(self, data: FramePushed):
+    async def on_push_frame(self, data: FramePushed) -> None:
         self.record(data.frame)

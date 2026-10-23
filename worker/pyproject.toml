@@ -1,9 +1,22 @@
 [project]
 name = "openfolio-worker"
-version = "0.1.0"
-description = "Openfolio voice worker: talk to a 3D AI version of a person, from one embed."
+version = "0.2.0"
+description = "Self-hosted voice server for Openfolio: an embeddable 3D talking AI avatar for portfolio websites."
 license = "Apache-2.0"
+authors = [{ name = "Faisal Rehman" }]
 requires-python = ">=3.11,<3.14"
+keywords = [
+  "ai-avatar", "talking-head", "voice-agent", "digital-twin", "portfolio",
+  "pipecat", "webrtc", "llm", "conversational-ai", "3d-avatar",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
   "pipecat-ai[webrtc,deepgram,elevenlabs,kokoro,openai,silero]==1.13.0",
   "fastapi>=0.115,<1",
@@ -11,7 +24,12 @@ dependencies = [
   "python-dotenv>=1.0",
   "pydantic>=2.7",
   "loguru>=0.7",
+  "httpx>=0.27",
 ]
+
+[project.urls]
+Homepage = "https://github.com/faisalrehmankhattak/openfolio"
+Issues = "https://github.com/faisalrehmankhattak/openfolio/issues"
 
 [project.optional-dependencies]
 whisper = ["pipecat-ai[whisper]==1.13.0"]
@@ -19,9 +37,10 @@ whisper = ["pipecat-ai[whisper]==1.13.0"]
 [project.scripts]
 openfolio-worker = "openfolio_worker.server:main"
 openfolio-doctor = "openfolio_worker.doctor:main"
+openfolio-schema = "openfolio_worker.persona:main"
 
 [dependency-groups]
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = ["pytest>=8", "ruff>=0.8", "mypy>=1.13"]
 
 [build-system]
 requires = ["hatchling"]
@@ -29,3 +48,34 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["openfolio_worker"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "S", "ASYNC", "PT", "RET", "C4"]
+ignore = ["RUF001"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["openfolio_worker"]
+known-local-folder = ["conftest"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106"]
+"openfolio_worker/persona.py" = ["E501"]  # the prompt template reads better unwrapped
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+warn_unused_ignores = false
+files = ["openfolio_worker"]
+
+# Pipecat ships partial types: subclassing its processors and its event decorators stay untyped.
+disallow_subclassing_any = false
+disallow_untyped_decorators = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

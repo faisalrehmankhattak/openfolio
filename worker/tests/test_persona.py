@@ -1,38 +1,65 @@
-from pathlib import Path
+import json
 
-from openfolio_worker.persona import build_system_prompt, load_personas
+import pytest
 
-PERSONAS = Path(__file__).resolve().parents[2] / "personas"
+from openfolio_worker.persona import Persona, PersonaError, build_system_prompt, load_personas
 
-
-def test_personas_load_and_ids_match_files():
-    personas = load_personas(PERSONAS)
-    assert "faisal" in personas
+from conftest import PERSONAS
 
 
-def test_prompt_carries_rules_and_facts():
-    p = load_personas(PERSONAS)["faisal"]
-    prompt = build_system_prompt(p)
+def _raw() -> dict:
+    return json.loads((PERSONAS / "faisal.json").read_text())
+
+
+def test_personas_load(persona):
+    assert persona.first_name == "Faisal"
+    assert persona.origins == {"https://faisalrehmanktk.com", "https://www.faisalrehmanktk.com"}
+
+
+def test_prompt_carries_rules_then_facts(persona):
+    prompt = build_system_prompt(persona)
     assert "AI version of Faisal" in prompt
     assert "Never name restaurant brands" in prompt
     assert "low 70s to over 90%" in prompt
+    assert prompt.index("# Honesty") < prompt.index("# About Faisal")
     assert "- - " not in prompt
 
 
-def test_public_view_hides_prompt_material():
-    view = load_personas(PERSONAS)["faisal"].public_view()
+def test_public_view_hides_prompt_material(persona):
+    view = persona.public_view()
     assert set(view) == {"id", "name", "first_name", "title", "tagline", "avatar", "quick_questions"}
+    assert "guardrails" not in json.dumps(view)
 
 
-def test_reasoning_effort_auto():
-    from dataclasses import replace
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"tagline_typo": "x"},
+        {"allowed_origins": ["https://example.com/path"]},
+        {"allowed_origins": ["ftp://example.com"]},
+        {"avatar": {"url": "http://cdn.example.com/a.glb"}},
+        {"links": [{"label": "x", "url": "javascript:alert(1)"}]},
+        {"email": "not-an-email"},
+        {"max_session_seconds": 5},
+    ],
+)
+def test_invalid_persona_rejected(change):
+    with pytest.raises(ValueError):  # noqa: PT011
+        Persona.model_validate(_raw() | change)
 
-    from openfolio_worker.config import llm_extra_params, load_settings
 
-    s = load_settings()
-    assert llm_extra_params(replace(s, llm_model="gpt-6-luna", llm_base_url=None, llm_reasoning_effort="auto")) == {"reasoning_effort": "none"}
-    assert llm_extra_params(replace(s, llm_model="gpt-5.6", llm_base_url=None, llm_reasoning_effort="auto")) == {"reasoning_effort": "none"}
-    assert llm_extra_params(replace(s, llm_model="gpt-4.1-mini", llm_base_url=None, llm_reasoning_effort="auto")) == {}
-    assert llm_extra_params(replace(s, llm_model="gpt-6-luna", llm_base_url="https://api.groq.com/openai/v1", llm_reasoning_effort="auto")) == {}
-    assert llm_extra_params(replace(s, llm_model="x", llm_reasoning_effort="off")) == {}
-    assert llm_extra_params(replace(s, llm_model="x", llm_reasoning_effort="low")) == {"reasoning_effort": "low"}
+def test_id_must_match_file_name(tmp_path):
+    (tmp_path / "other.json").write_text(json.dumps(_raw()))
+    with pytest.raises(PersonaError, match="must match the file name"):
+        load_personas(tmp_path)
+
+
+def test_broken_json_names_the_file(tmp_path):
+    (tmp_path / "broken.json").write_text("{")
+    with pytest.raises(PersonaError, match=r"broken\.json"):
+        load_personas(tmp_path)
+
+
+def test_schema_file_is_current():
+    schema = json.loads((PERSONAS.parent / "persona.schema.json").read_text())
+    assert schema == Persona.model_json_schema(by_alias=True), "run: uv run openfolio-schema > ../persona.schema.json"

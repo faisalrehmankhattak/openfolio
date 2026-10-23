@@ -1,0 +1,420 @@
+{
+  "$defs": {
+    "Avatar": {
+      "additionalProperties": false,
+      "description": "A GLB with a TalkingHead-compatible rig (Ready Player Me, Avaturn, ...).",
+      "properties": {
+        "kind": {
+          "const": "mesh",
+          "default": "mesh",
+          "title": "Kind",
+          "type": "string"
+        },
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "body": {
+          "default": "M",
+          "enum": [
+            "M",
+            "F"
+          ],
+          "title": "Body",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "Avatar",
+      "type": "object"
+    },
+    "Link": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "maxLength": 60,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "url"
+      ],
+      "title": "Link",
+      "type": "object"
+    },
+    "Project": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "org": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Org"
+        },
+        "period": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Period"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "metric": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metric"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "required": [
+        "name",
+        "summary"
+      ],
+      "title": "Project",
+      "type": "object"
+    },
+    "QuickQuestion": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "maxLength": 24,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "question": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "question"
+      ],
+      "title": "QuickQuestion",
+      "type": "object"
+    },
+    "Role": {
+      "additionalProperties": false,
+      "properties": {
+        "company": {
+          "title": "Company",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "period": {
+          "title": "Period",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "company",
+        "title",
+        "period",
+        "summary"
+      ],
+      "title": "Role",
+      "type": "object"
+    },
+    "Voice": {
+      "additionalProperties": false,
+      "description": "Optional per-persona voice; falls back to the server default.",
+      "properties": {
+        "provider": {
+          "anyOf": [
+            {
+              "enum": [
+                "elevenlabs",
+                "kokoro"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider"
+        },
+        "voice_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Voice Id"
+        }
+      },
+      "title": "Voice",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "id": {
+      "pattern": "^[a-z0-9-]{2,40}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "first_name": {
+      "title": "First Name",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "tagline": {
+      "title": "Tagline",
+      "type": "string"
+    },
+    "pronouns": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Pronouns"
+    },
+    "about": {
+      "title": "About",
+      "type": "string"
+    },
+    "highlights": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Highlights",
+      "type": "array"
+    },
+    "experience": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Role"
+      },
+      "title": "Experience",
+      "type": "array"
+    },
+    "projects": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Project"
+      },
+      "title": "Projects",
+      "type": "array"
+    },
+    "skills": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "default": {},
+      "title": "Skills",
+      "type": "object"
+    },
+    "education": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Education",
+      "type": "array"
+    },
+    "awards": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Awards",
+      "type": "array"
+    },
+    "links": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Link"
+      },
+      "title": "Links",
+      "type": "array"
+    },
+    "email": {
+      "anyOf": [
+        {
+          "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Email"
+    },
+    "booking_url": {
+      "anyOf": [
+        {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Booking Url"
+    },
+    "quick_questions": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/QuickQuestion"
+      },
+      "maxItems": 6,
+      "title": "Quick Questions",
+      "type": "array"
+    },
+    "guardrails": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Guardrails",
+      "type": "array"
+    },
+    "avatar": {
+      "$ref": "#/$defs/Avatar"
+    },
+    "voice": {
+      "$ref": "#/$defs/Voice",
+      "default": {
+        "provider": null,
+        "voice_id": null
+      }
+    },
+    "allowed_origins": {
+      "default": [],
+      "items": {
+        "format": "uri",
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Allowed Origins",
+      "type": "array"
+    },
+    "max_session_seconds": {
+      "default": 600,
+      "maximum": 1800,
+      "minimum": 30,
+      "title": "Max Session Seconds",
+      "type": "integer"
+    },
+    "idle_seconds": {
+      "default": 60,
+      "maximum": 600,
+      "minimum": 15,
+      "title": "Idle Seconds",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "first_name",
+    "title",
+    "tagline",
+    "about",
+    "avatar"
+  ],
+  "title": "Persona",
+  "type": "object"
+}
