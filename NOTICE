@@ -1,9 +1,13 @@
 Openfolio
 Copyright 2026 Faisal Rehman
 
-This product includes software developed by third parties under their own
-licenses; see README.md (Licenses).
+Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-Male demo avatar: official readyplayerme/visage sample.
-Copyright (c) 2023 Ready Player Me.
-The upstream MIT notice is included at avatars/LICENSE-readyplayerme.txt.
+Demo avatar: Ready Player Me Visage male sample (public/male.glb),
+pinned at revision 0eafdd9c4c10db079de2656c3eb59212a2fb7f63,
+SHA-256 b06bd9df4d7d71d92774f895be31305cb8ff26f966f4c353beb82d3ccd94bea2.
+Copyright (c) 2023 Ready Player Me. MIT license: avatars/LICENSE-readyplayerme.txt.
+This covers the sample file only, not avatars made with the Ready Player Me service.
+
+Third-party packages are used under their own licenses, including
+Pipecat (BSD-2-Clause), TalkingHead and HeadAudio (MIT) and three.js (MIT).

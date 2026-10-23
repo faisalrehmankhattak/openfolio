@@ -3,7 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Openfolio demo</title>
+  <title>Openfolio: a 3D talking AI avatar for your portfolio</title>
+  <meta name="description" content="Open-source, self-hosted widget that lets visitors talk to a 3D AI version of you by voice or text. One script tag, no GPU.">
+  <meta property="og:title" content="Openfolio: your portfolio, alive">
+  <meta property="og:description" content="Visitors talk face to face with a 3D AI version of you, by voice or text, from one line of HTML.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%2317202b'/%3E%3Ctext x='16' y='21' font-size='13' font-family='sans-serif' font-weight='700' fill='white' text-anchor='middle'%3EAI%3C/text%3E%3C/svg%3E">
   <style>
     body { margin: 0; font: 16px/1.6 ui-sans-serif, system-ui, sans-serif; color: #14161a; background: #fafafa; }
     main { max-width: 720px; margin: 0 auto; padding: 64px 24px; }
@@ -16,11 +22,11 @@
 <body>
   <main>
     <h1>Any portfolio, now with a face and a voice.</h1>
-    <p>This stands in for your site. The bubble in the corner comes from one line:</p>
-    <pre>&lt;script src="http://127.0.0.1:7860/embed/embed.js?v=modes" data-persona="faisal" async&gt;&lt;/script&gt;</pre>
+    <p>This page stands in for your site. The button in the corner comes from one line:</p>
+    <pre>&lt;script src="https://YOUR-SERVER/embed/embed.js" data-persona="faisal" async&gt;&lt;/script&gt;</pre>
     <p>Or place it inside a layout with <code>&lt;openfolio-agent persona="faisal" mode="inline"&gt;</code>.</p>
-    <p class="note">The face is a placeholder (the male Ready Player Me sample) until a head is built from the owner's selfie.</p>
+    <p class="note">The face is the Ready Player Me sample avatar. Point <code>avatar.url</code> in your persona file at your own GLB.</p>
   </main>
-  <script src="/embed/embed.js?v=modes" data-persona="faisal" data-label="Talk to Faisal" async></script>
+  <script src="/embed/embed.js" data-persona="faisal" data-label="Talk to Faisal" async></script>
 </body>
 </html>

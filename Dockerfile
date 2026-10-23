@@ -7,7 +7,7 @@ COPY embed/src/ ./src/
 COPY embed/tsconfig.json embed/vite.*.ts ./
 RUN npm run typecheck && npm run build
 
-# Bake the pinned male sample into the image; attribution is included below.
+# Pinned, checksum-verified demo avatar (attribution in NOTICE).
 FROM debian:bookworm-slim AS avatar
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /avatars && curl -fsSL --retry 3 \
@@ -25,7 +25,7 @@ WORKDIR /app
 COPY personas/ ./personas/
 COPY demo/ ./demo/
 COPY LICENSE NOTICE ./
-COPY avatars/README.md avatars/LICENSE-readyplayerme.txt ./avatars/
+COPY avatars/LICENSE-readyplayerme.txt ./avatars/
 COPY --from=avatar /avatars/ ./avatars/
 COPY --from=widget /build/embed/dist/ ./embed/dist/
 RUN useradd --create-home --uid 10001 openfolio && mkdir -p /app/data/inbox /home/openfolio/.cache && chown -R openfolio:openfolio /app/data /home/openfolio

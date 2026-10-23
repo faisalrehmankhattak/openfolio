@@ -1,22 +1,18 @@
 /**
- * embed.js — the only file a site includes.
+ * embed.js: the only file a site includes.
  *
- *   <script src="https://YOUR-SERVER/embed/embed.js" data-persona="faisal" async></script>
+ *   <script src="https://YOUR-SERVER/embed/embed.js" data-persona="you" async></script>
  *
- * It stays tiny: it defines <openfolio-agent>, draws a launcher, and loads the
- * real app (3D head, voice, chat) only when a visitor opens it, so the host
- * page never pays for what nobody uses.
+ * Defines <openfolio-agent> and a launcher; the 3D head, voice and chat load only when opened.
  */
+import type { Mode } from "./types";
 
 declare const __OPENFOLIO_BUILD__: string;
 
-type Mode = "bubble" | "inline";
-
 const script = document.currentScript as HTMLScriptElement | null;
 const scriptUrl = script?.src ? new URL(script.src) : null;
-// Where the app chunks live: next to this file.
 const assetBase = scriptUrl ? new URL(".", scriptUrl).href : "";
-// Default server: the origin that served this script.
+// Chunks are served next to this file, by the server that served it.
 const defaultServer = scriptUrl ? scriptUrl.origin : location.origin;
 
 const LAUNCHER_CSS = `
@@ -73,7 +69,8 @@ class OpenfolioAgent extends HTMLElement {
   async open() {
     if (this.opened) return;
     this.opened = true;
-    const root = this.shadowRoot!;
+    const root = this.shadowRoot;
+    if (!root) return;
     const launcher = root.querySelector(".of-launch") as HTMLElement | null;
     if (launcher) launcher.style.display = "none";
     const loading = document.createElement("div");

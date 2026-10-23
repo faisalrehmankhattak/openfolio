@@ -1,69 +1,65 @@
 /**
- * app.js — loaded by embed.js when a visitor opens the widget.
+ * app.js: loaded by embed.js when a visitor opens the widget.
  *
- * A portrait call: the 3D face fills the panel, speech appears as captions,
- * cards and the transcript slide up as sheets.
- *
- * Voice: Pipecat client over WebRTC to the Openfolio worker.
- * Face: TalkingHead renders the head; HeadAudio lip-syncs it from the incoming
- * voice in the browser, so the server never sends video.
+ * Voice runs over WebRTC to the Openfolio server (Pipecat). The face is drawn
+ * here: TalkingHead renders the head and HeadAudio lip-syncs it from the
+ * incoming voice, so the server never sends video.
  */
-import { PipecatClient } from "@pipecat-ai/client-js";
+import { type BotOutputData, PipecatClient, type RTVIMessage, type TranscriptData } from "@pipecat-ai/client-js";
 import { SmallWebRTCTransport } from "@pipecat-ai/small-webrtc-transport";
 import { renderCard } from "./cards";
 import { h } from "./dom";
 import { icon } from "./icons";
 import { LocalMediaManager } from "./media";
 import { PANEL_CSS } from "./styles";
+import { explainConnectError, explainProviderError, isHangUp, isLocal, isSeriousError, lastSentences } from "./text";
+import type { EndReason, Head, MountOptions, PersonaInfo, ServerMessage } from "./types";
 import { ARKIT_VISEME_FALLBACKS } from "./visemes";
 
-export type MountOptions = {
-  persona: string;
-  server: string;
-  assetBase: string;
-  mode: "bubble" | "inline";
-  onClose?: () => void;
-};
+export type { MountOptions } from "./types";
 
-type PersonaInfo = {
-  id: string;
-  name: string;
-  first_name: string;
-  title: string;
-  tagline: string;
-  avatar: { kind: string; url: string; body: string };
-  quick_questions: { label: string; question: string }[];
-};
-
-type Head = { audioCtx: AudioContext; audioAnalyzerNode: AudioNode; audioSpeechGainNode: GainNode; start(): void; stop(): void };
 type CallState = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "ready";
 
 // Head-and-shoulders framing for a tall portrait panel (TalkingHead "upper" view).
 const CAMERA = { y: 0.1, distance: -0.6 };
+const SPEECH_GAIN = 3;
 
-const isLocal = (url: string) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(url);
+const END_HINTS: Record<EndReason | "", string> = {
+  idle: "The call ended because it went quiet. Ask anything to start again.",
+  turn_limit: "That's the end of this call. Start a new one anytime.",
+  voice_command: "Call ended. Ask anything to start again.",
+  "": "Call ended. Ask anything to start again.",
+};
 
-export async function mount(root: ShadowRoot, opts: MountOptions) {
+function isServerMessage(m: unknown): m is ServerMessage {
+  const type = (m as { type?: unknown } | null)?.type;
+  return type === "openfolio.card" || type === "openfolio.ended";
+}
+
+export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void> {
+  // Every listener on objects that outlive the panel is removed when it closes.
+  const life = new AbortController();
   const style = h("style", {}, PANEL_CSS);
   const panel = h("div", { class: `panel ${opts.mode}`, role: "dialog", "aria-label": "Talk to an AI version" });
   root.append(style, panel);
 
+  const personaUrl = `${opts.server}/v1/personas/${encodeURIComponent(opts.persona)}`;
   let info: PersonaInfo;
   try {
-    const res = await fetch(`${opts.server}/v1/personas/${encodeURIComponent(opts.persona)}`);
+    const res = await fetch(personaUrl);
     if (!res.ok) throw new Error(`persona ${res.status}`);
-    info = await res.json();
+    info = (await res.json()) as PersonaInfo;
   } catch (err) {
     panel.append(h("div", { class: "fallback" }, h("p", {}, "This assistant isn't available right now.")));
     console.error("[openfolio]", err);
     return;
   }
   const first = info.first_name;
+  const showDetails = isLocal(opts.server) || isLocal(location.href);
   let chatOpen = false;
   let textOnly = false;
-  const showDetails = isLocal(opts.server) || isLocal(location.href);
 
-  // ---- layout -------------------------------------------------------------
+  // ---- layout ---------------------------------------------------------------
   const headEl = h("div", { class: "head", "aria-hidden": "true" });
   const loading = h("div", { class: "loading" }, "Getting ready");
   const subText = h("span", { class: "text" }, info.title);
@@ -79,7 +75,6 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
       h("div", { class: "name" }, info.name),
       h("span", { class: "ai", title: `This is an AI version of ${first}, answering from ${first}'s portfolio` }, "AI"),
       h("span", { class: "spacer" }),
-
       opts.mode === "bubble" ? closeBtn : null,
     ),
     sub,
@@ -89,49 +84,55 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
   const capBot = h("div", { class: "cap-bot hint" }, `Hi, I'm an AI version of ${first}. Ask me about my work.`);
   const notice = h("div", { class: "notice", role: "alert", hidden: true });
   const captions = h("div", { class: "captions", "aria-live": "polite" }, capUser, capBot);
-
   const suggest = h(
     "div",
     { class: "suggest" },
     ...info.quick_questions.map((q) => h("button", { type: "button", onclick: () => void ask(q.question) }, q.label)),
   );
 
-  // Card sheet and transcript sheet share one look.
-  function makeSheet(label: string) {
-    const title = h("h3", {}, label);
-    const body = h("div", { class: "sheet-body" });
-    const close = h("button", { class: "iconbtn", type: "button", "aria-label": `Close ${label.toLowerCase()}` }, icon("down"));
-    const el = h("section", { class: "sheet", "aria-label": label }, h("div", { class: "sheet-head" }, title, close), body);
-    close.addEventListener("click", () => el.classList.remove("open"));
-    return { el, title, body };
-  }
-  const cardSheet = makeSheet("Card");
-  const logSheet = makeSheet("Chat");
-  logSheet.el.className = "chat-pane";
-  logSheet.body.setAttribute("role", "log");
-  logSheet.body.setAttribute("aria-live", "polite");
-  const chatClose = logSheet.el.querySelector("button")!;
-  chatClose.setAttribute("aria-label", "Close chat");
-  chatClose.addEventListener("click", () => setChat(false));
-
+  const chatLog = h("div", { class: "sheet-body", role: "log", "aria-live": "polite" });
   const startBtn = h("button", { class: "start", type: "button" }, icon("mic"), h("span", {}, `Talk to ${first}`));
-  const micBtn = h("button", { class: "mic", type: "button", hidden: true, "aria-label": "Mute microphone" }, h("span", { class: "ring" }), icon("mic"));
-  const endBtn = h("button", { class: "side end", type: "button", "aria-label": "End call", hidden: true }, icon("end"));
+  const startLabel = startBtn.lastChild as HTMLSpanElement;
+  const micBtn = h("button", { class: "mic", type: "button", hidden: true, "aria-label": "Mute microphone" });
+  const endBtn = h(
+    "button",
+    { class: "side end", type: "button", "aria-label": "End call", hidden: true },
+    icon("end"),
+  );
   const chatEndBtn = h("button", { class: "chat-end", type: "button", hidden: true }, "End session");
-  chatEndBtn.addEventListener("click", () => void hangUp());
-  const voiceSwitch = h("button", { class: "side voice-switch", type: "button", "aria-label": "Switch to voice", title: "Switch to voice" }, icon("mic"));
-  voiceSwitch.addEventListener("click", () => { setChat(false); (startBtn.hidden ? micBtn : startBtn).focus(); });
-  const chatSwitch = h("button", { class: "side", type: "button", "aria-label": "Switch to chat", title: "Switch to chat" }, icon("keyboard"));
-  chatSwitch.addEventListener("click", () => setChat(true));
-  const input = h("input", { type: "text", placeholder: `Ask ${first} anything`, "aria-label": "Your question", maxlength: "500", enterkeyhint: "send" });
+  const voiceSwitch = h(
+    "button",
+    { class: "side voice-switch", type: "button", "aria-label": "Switch to voice", title: "Switch to voice" },
+    icon("mic"),
+  );
+  const chatSwitch = h(
+    "button",
+    { class: "side", type: "button", "aria-label": "Switch to chat", title: "Switch to chat" },
+    icon("keyboard"),
+  );
+  const input = h("input", {
+    type: "text",
+    placeholder: `Ask ${first} anything`,
+    "aria-label": "Your question",
+    maxlength: "500",
+    enterkeyhint: "send",
+  });
   const sendBtn = h("button", { class: "side send", type: "submit", "aria-label": "Send" }, icon("send"));
   const typeRow = h(
     "form",
-    { class: "typebar", hidden: true, onsubmit: (e: Event) => { e.preventDefault(); void ask(input.value); } },
+    {
+      class: "typebar",
+      hidden: true,
+      onsubmit: (e: Event) => {
+        e.preventDefault();
+        void ask(input.value);
+      },
+    },
     voiceSwitch,
     input,
     sendBtn,
   );
+  const chatPane = h("section", { class: "chat-pane", "aria-label": "Chat" }, chatLog, typeRow, chatEndBtn);
   const controls = h(
     "div",
     { class: "controls" },
@@ -140,59 +141,82 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     h("div", { class: "right" }, endBtn),
   );
   const foot = h("div", { class: "foot" }, `AI version of ${first}. It can make mistakes.`);
-  const bar = h("div", { class: "bar" }, controls, foot);
-
   const lower = h("div", { class: "lower" }, notice, captions, suggest);
-  logSheet.el.querySelector(".sheet-head")!.remove();
-  logSheet.el.append(typeRow, chatEndBtn);
-  panel.append(headEl, loading, top, lower, logSheet.el, bar);
+  panel.append(headEl, loading, top, lower, chatPane, h("div", { class: "bar" }, controls, foot));
 
-  function setChat(open: boolean, typing = true, focusInput = true) {
+  function setChat(open: boolean): void {
     chatOpen = open;
-    if (open) logSheet.el.prepend(notice); else lower.prepend(notice);
-    if (open && typing) { textOnly = true; updateAudioMode(); }
+    (open ? chatPane : lower).prepend(notice);
     panel.classList.toggle("chat-open", open);
     typeRow.hidden = !open;
     if (open) {
-      if (typing && client && !muted) { muted = true; client.enableMic(false); setMicLook(); }
-      if (state === "listening" || state === "ready") setState("ready");
-      if (focusInput) input.focus();
+      textOnly = true;
+      updateAudioMode();
+      if (client && !muted) {
+        muted = true;
+        client.enableMic(false);
+        setMicLook();
+      }
+      input.focus();
     }
-    if (state === "ready") setState("ready");
+    if (state === "listening" || state === "ready") setState("ready");
   }
 
-  // ---- transcript + captions ---------------------------------------------
+  // ---- transcript and captions ---------------------------------------------
   type Turn = { el: HTMLElement; segments: Map<string, string> };
   let botTurn: Turn | null = null;
+  let streaming = false;
+  let streamBuf = "";
+  let lastQuestion = "";
 
-  function logLine(text: string, kind: "user" | "bot" | "note") {
+  function logLine(text: string, kind: "user" | "bot" | "note"): HTMLElement {
     const el = h("p", { class: `line ${kind}` }, text);
-    logSheet.body.append(el);
-    logSheet.body.scrollTop = logSheet.body.scrollHeight;
+    chatLog.append(el);
+    chatLog.scrollTop = chatLog.scrollHeight;
     return el;
   }
-  function showHint(text: string, kind: "hint" | "error" = "hint") {
+
+  function showHint(text: string): void {
     capUser.textContent = "";
-    capBot.className = `cap-bot ${kind}`;
+    capBot.className = "cap-bot hint";
     capBot.textContent = text;
   }
-  let lastQuestion = "";
-  function hideNotice() {
+
+  function setCaption(text: string): void {
+    capBot.classList.remove("hint", "error");
+    capBot.textContent = text;
+  }
+
+  function hideNotice(): void {
     notice.hidden = true;
     notice.replaceChildren();
   }
-  // Errors become a short card with a plain explanation; the raw provider
-  // message is one tap away on the owner's own machine.
-  function showNotice(title: string, body: string, details?: string, canRetry = false) {
-    const x = h("button", { class: "x", type: "button", "aria-label": "Dismiss" }, icon("close"));
-    x.addEventListener("click", hideNotice);
+
+  // Errors become a short notice in plain words; raw details only on the owner's machine.
+  function showNotice(title: string, body: string, details?: string, canRetry = false): void {
+    const dismiss = h(
+      "button",
+      { class: "x", type: "button", "aria-label": "Dismiss", onclick: hideNotice },
+      icon("close"),
+    );
     const links = h("div", { class: "links" });
-    const detailsEl = details ? h("div", { class: "details", hidden: true }, details) : null;
     if (canRetry && lastQuestion) {
-      const retry = h("button", { type: "button" }, "Try again");
-      retry.addEventListener("click", () => { hideNotice(); void ask(lastQuestion); });
-      links.append(retry);
+      const question = lastQuestion;
+      links.append(
+        h(
+          "button",
+          {
+            type: "button",
+            onclick: () => {
+              hideNotice();
+              void ask(question);
+            },
+          },
+          "Try again",
+        ),
+      );
     }
+    const detailsEl = details ? h("div", { class: "details", hidden: true }, details) : null;
     if (detailsEl) {
       const toggle = h("button", { type: "button" }, "Show details");
       toggle.addEventListener("click", () => {
@@ -204,7 +228,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     notice.replaceChildren(
       h("span", { class: "mark", "aria-hidden": "true" }, "!"),
       h("div", { class: "title" }, title),
-      x,
+      dismiss,
       h("div", { class: "body" }, body),
     );
     if (links.childElementCount) notice.append(links);
@@ -213,179 +237,175 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     capBot.textContent = "";
     capUser.textContent = "";
   }
-  function explain(raw: string): { title: string; body: string } {
-    if (/does not exist|model_not_found|not have access to (the )?model/i.test(raw))
-      return { title: "The AI model isn't available", body: "The model name in the server settings isn't available on this account." };
-    if (/reasoning_effort|function tools/i.test(raw))
-      return { title: "The AI model rejected the request", body: "This model needs different settings to use tools. Update the server and restart it." };
-    if (/api key|unauthorized|401|invalid_api_key|authentication/i.test(raw))
-      return { title: "The AI key was rejected", body: "Check the API key in the server settings." };
-    if (/quota|rate limit|429|billing/i.test(raw))
-      return { title: "The AI service is over its limit", body: "The account has hit a usage or billing limit. Try again later." };
-    return { title: "Couldn't get an answer", body: "Something went wrong on the server. Try again in a moment." };
+
+  function userSaid(text: string, final: boolean): void {
+    capUser.textContent = text;
+    if (!final) return;
+    logLine(`You: ${text}`, "user");
+    botTurn = null;
+    if (!muted && isHangUp(text)) void hangUp();
   }
 
-  function userSaid(text: string, final: boolean) {
-    capUser.textContent = text;
-    if (final) {
-      if (!muted && /^(?:(?:please|okay|ok)\s+)?(?:end (?:the |this )?call|hang up|disconnect|stop (?:the |this )?call)[.!?]*$/i.test(text.trim())) {
-        logLine(`You: ${text}`, "user");
-        void hangUp();
-        return;
-      }
-      logLine(`You: ${text}`, "user");
-      botTurn = null;
-    }
-  }
-  // Pipecat reports each sentence several times (queued, then spoken) under one
-  // segment id; keep one entry per segment and show the latest sentences.
-  function botSaid(text: string, segmentId?: string | number) {
+  // Pipecat reports a sentence several times (queued, then spoken) under one
+  // segment id; keep one entry per segment.
+  function botSaid(text: string, segmentId?: string | number): void {
     if (streaming) return;
-    if (!botTurn) botTurn = { el: logLine("", "bot"), segments: new Map() };
+    botTurn ??= { el: logLine("", "bot"), segments: new Map() };
     botTurn.segments.set(segmentId === undefined ? `t:${text}` : `s:${segmentId}`, text);
     const sentences = [...botTurn.segments.values()];
     botTurn.el.textContent = `${first}: ${sentences.join(" ")}`;
-    if (!streaming) setCaption(sentences.slice(-2).join(" "));
+    setCaption(sentences.slice(-2).join(" "));
   }
 
-  // Captions follow the model's text as it streams, so an answer starts
-  // appearing at once instead of waiting for the voice.
-  let streaming = false;
-  let streamBuf = "";
-  function setCaption(text: string) {
-    capBot.classList.remove("hint", "error");
-    capBot.textContent = text;
-  }
-  // A new answer: captions switch to live text only once live text arrives,
-  // and otherwise follow the spoken sentences.
-  function streamStart() {
+  // Captions follow the model's text as it streams, ahead of the voice.
+  function streamStart(): void {
     streaming = false;
     streamBuf = "";
     botTurn = null;
-    replay(capBot, "in");
+    capBot.classList.remove("in");
+    void capBot.offsetWidth; // restart the entry animation
+    capBot.classList.add("in");
   }
-  function replay(el: HTMLElement, cls: string) {
-    el.classList.remove(cls);
-    void el.offsetWidth; // restart the CSS animation
-    el.classList.add(cls);
-  }
-  function streamText(chunk: string) {
+
+  function streamText(chunk: string): void {
     streaming = true;
     streamBuf += chunk;
-    if (!botTurn) botTurn = { el: logLine("", "bot"), segments: new Map() };
+    botTurn ??= { el: logLine("", "bot"), segments: new Map() };
     botTurn.el.textContent = `${first}: ${streamBuf}`;
-    logSheet.body.scrollTop = logSheet.body.scrollHeight;
-    // Keep the caption to the last two sentences so it never grows past three lines.
-    const parts = streamBuf.trim().split(/(?<=[.!?])\s+/);
-    setCaption(parts.slice(-2).join(" "));
+    chatLog.scrollTop = chatLog.scrollHeight;
+    setCaption(lastSentences(streamBuf));
   }
 
-  function showCard(card: string, data: unknown) {
-    const c = renderCard(card, data, first);
-    if (!c) return;
-    logSheet.body.append(h("section", { class: "chat-card" }, h("h3", {}, c.title), c.body));
-    logSheet.body.scrollTop = logSheet.body.scrollHeight;
+  function onServerMessage(m: unknown): void {
+    if (!isServerMessage(m)) return;
+    if (m.type === "openfolio.ended") {
+      endedReason = m.reason;
+      return;
+    }
+    const card = renderCard(m, first);
+    if (!card) return;
+    chatLog.append(h("section", { class: "chat-card" }, h("h3", {}, card.title), card.body));
+    chatLog.scrollTop = chatLog.scrollHeight;
   }
 
-  // ---- face ---------------------------------------------------------------
+  // ---- face -----------------------------------------------------------------
   let head: Head | null = null;
-  const faceReady = loadFace()
-    .catch((err) => {
-      console.warn("[openfolio] 3D face unavailable, using voice only", err);
-      headEl.replaceChildren(h("div", { class: "fallback" }, h("span", {}, first.slice(0, 1))));
-      headEl.classList.add("ready");
-      return null;
-    })
-    .then((face) => {
-      loading.remove();
-      headEl.classList.add("ready");
-      if (face) attachPendingAudio(face);
-      return face;
-    });
 
   async function loadFace(): Promise<Head> {
     const [{ TalkingHead }, { HeadAudio }] = await Promise.all([
       import("@met4citizen/talkinghead"),
-      // @ts-ignore: the package ships an ES module without types
       import("@met4citizen/headaudio/dist/headaudio.min.mjs"),
     ]);
-    const th: any = new TalkingHead(headEl, {
+    const th = new TalkingHead(headEl, {
       ttsEndpoint: "N/A",
       lipsyncModules: [],
       cameraView: "upper",
       cameraY: CAMERA.y,
       cameraDistance: CAMERA.distance,
       cameraRotateEnable: false,
-      mixerGainSpeech: 3,
+      mixerGainSpeech: SPEECH_GAIN,
       avatarMood: "neutral",
     });
     th.mtExtras.push(...ARKIT_VISEME_FALLBACKS);
     const avatarUrl = new URL(info.avatar.url, `${opts.server}/`).href;
-    await th.showAvatar({ url: avatarUrl, body: info.avatar.body || "M", avatarMood: "neutral", lipsyncLang: "en" }, (ev: ProgressEvent) => {
-      if (ev.lengthComputable) loading.textContent = `Getting ready ${Math.round((ev.loaded / ev.total) * 100)}%`;
-    });
+    await th.showAvatar(
+      { url: avatarUrl, body: info.avatar.body, avatarMood: "neutral", lipsyncLang: "en" },
+      (ev: ProgressEvent) => {
+        if (ev.lengthComputable) loading.textContent = `Getting ready ${Math.round((ev.loaded / ev.total) * 100)}%`;
+      },
+    );
 
-    // Audio-driven lip-sync: works with any voice, no timestamps needed.
+    // Lip-sync from the audio itself, so every voice provider works the same way.
     await th.audioCtx.audioWorklet.addModule(`${opts.assetBase}headworklet.min.mjs`);
-    const lips: any = new HeadAudio(th.audioCtx);
+    const lips = new HeadAudio(th.audioCtx);
     await lips.loadModel(`${opts.assetBase}model-en-mixed.bin`);
     th.audioSpeechGainNode.connect(lips);
-    lips.onvalue = (key: string, value: number) => {
-      Object.assign(th.mtAvatar[key], { newvalue: value, needsUpdate: true });
-    };
+    lips.onvalue = (key, value) => Object.assign(th.mtAvatar[key], { newvalue: value, needsUpdate: true });
     th.opt.update = lips.update.bind(lips);
     let lastEnded = 0;
-    lips.onended = () => (lastEnded = Date.now());
+    lips.onended = () => {
+      lastEnded = Date.now();
+    };
     lips.onstarted = () => {
       if (Date.now() - lastEnded > 150) th.lookAtCamera(500);
     };
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") { th.start(); lips.start(); } else { lips.stop(); th.stop(); }
-    });
-    if (showDetails) (window as any).__openfolioHead = th; // for tuning the camera in development
-    head = th as Head;
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        if (document.visibilityState === "visible") {
+          th.start();
+          lips.start();
+        } else {
+          lips.stop();
+          th.stop();
+        }
+      },
+      { signal: life.signal },
+    );
+    if (showDetails) Object.assign(window, { __openfolioHead: th }); // camera tuning in development
+    head = th;
     updateAudioMode();
-    return head;
+    return th;
   }
 
-  // ---- call state ---------------------------------------------------------
+  void loadFace()
+    .catch((err: unknown) => {
+      console.warn("[openfolio] 3D face unavailable, using voice only", err);
+      headEl.replaceChildren(h("div", { class: "fallback" }, h("span", {}, first.slice(0, 1))));
+      return null;
+    })
+    .then((face) => {
+      loading.remove();
+      headEl.classList.add("ready");
+      if (face) attachPendingAudio(face);
+    });
+
+  // ---- call state -----------------------------------------------------------
   let state: CallState = "idle";
-  function setState(next: CallState) {
-    if ((next === "listening" && muted) || (next === "speaking" && textOnly)) next = "ready";
+  const STATE_WORDS: Record<Exclude<CallState, "idle" | "ready">, string> = {
+    connecting: "Connecting",
+    listening: "Listening",
+    thinking: "Thinking",
+    speaking: "Speaking",
+  };
+
+  function setState(requested: CallState): void {
+    const next = (requested === "listening" && muted) || (requested === "speaking" && textOnly) ? "ready" : requested;
     state = next;
     const live = next !== "idle" && next !== "connecting";
-    const words: Record<CallState, string> = {
-      idle: info.title,
-      ready: chatOpen ? "Chat ready" : "Microphone off",
-      connecting: "Connecting",
-      listening: "Listening",
-      thinking: "Thinking",
-      speaking: "Speaking",
-    };
     sub.className = `sub${live ? " live" : ""}${next === "speaking" ? " speaking" : ""}`;
     subDot.hidden = !live;
-    subText.textContent = words[next];
+    subText.textContent =
+      next === "idle"
+        ? info.title
+        : next === "ready"
+          ? chatOpen
+            ? "Chat ready"
+            : "Microphone off"
+          : STATE_WORDS[next];
     startBtn.hidden = live && !(muted && !chatOpen);
     startBtn.disabled = next === "connecting";
-    (startBtn.lastChild as HTMLElement).textContent = next === "connecting" ? "Connecting" : live && muted ? "Resume voice" : `Talk to ${first}`;
+    startLabel.textContent = next === "connecting" ? "Connecting" : live && muted ? "Resume voice" : `Talk to ${first}`;
     micBtn.hidden = !live || (muted && !chatOpen);
     endBtn.hidden = !live;
     chatEndBtn.hidden = !live;
-    // Chips stay in place for the whole call so the captions never jump.
-    suggest.querySelectorAll("button").forEach((b) => ((b as HTMLButtonElement).disabled = next === "connecting"));
+    for (const b of suggest.querySelectorAll("button")) b.disabled = next === "connecting";
   }
 
-  // ---- mic level ring -----------------------------------------------------
-  let levelStop: (() => void) | null = null;
-  function watchMicLevel(track: MediaStreamTrack) {
-    levelStop?.();
-    const ctx = head?.audioCtx ?? new AudioContext();
+  // ---- mic level ring -------------------------------------------------------
+  let stopLevel: (() => void) | null = null;
+
+  function watchMicLevel(track: MediaStreamTrack): void {
+    stopLevel?.();
+    const ownCtx = head ? null : new AudioContext();
+    const ctx = head?.audioCtx ?? (ownCtx as AudioContext);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
-    ctx.createMediaStreamSource(new MediaStream([track])).connect(analyser);
+    const source = ctx.createMediaStreamSource(new MediaStream([track]));
+    source.connect(analyser);
     const buf = new Uint8Array(analyser.fftSize);
     let raf = 0;
-    const tick = () => {
+    const tick = (): void => {
       analyser.getByteTimeDomainData(buf);
       let sum = 0;
       for (const v of buf) sum += ((v - 128) / 128) ** 2;
@@ -394,173 +414,211 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
       raf = requestAnimationFrame(tick);
     };
     tick();
-    levelStop = () => { cancelAnimationFrame(raf); analyser.disconnect(); };
+    stopLevel = () => {
+      cancelAnimationFrame(raf);
+      source.disconnect();
+      void ownCtx?.close();
+    };
   }
 
-  // ---- conversation -------------------------------------------------------
+  // ---- conversation ---------------------------------------------------------
   let client: PipecatClient | null = null;
-  let connectionGeneration = 0;
+  let generation = 0;
   let connecting: Promise<void> | null = null;
   let playEl: HTMLAudioElement | null = null;
   let botStream: MediaStream | null = null;
   let onFace = false;
   let muted = false;
-  let endedReason = "";
+  let endedReason: EndReason | "" = "";
 
-  // The voice plays through the face (which lip-syncs it) when the face is
-  // ready, and through a plain audio element until then.
-  function updateAudioMode() {
-    if (head) head.audioSpeechGainNode.gain.value = textOnly ? 0 : 3;
+  // The voice plays through the face (which lip-syncs it) once it is ready,
+  // and through a plain audio element until then.
+  function updateAudioMode(): void {
+    if (head) head.audioSpeechGainNode.gain.value = textOnly ? 0 : SPEECH_GAIN;
     if (playEl) playEl.muted = onFace || textOnly;
   }
-  function routeBotAudio(stream: MediaStream) {
+
+  function routeBotAudio(stream: MediaStream): void {
     botStream = stream;
     onFace = false;
     playEl = new Audio();
     playEl.srcObject = stream;
     playEl.autoplay = true;
     updateAudioMode();
-    if (head && head.audioCtx.state === "running") moveAudioToFace(head);
+    if (head?.audioCtx.state === "running") moveAudioToFace(head);
   }
-  function moveAudioToFace(face: Head) {
+
+  function moveAudioToFace(face: Head): void {
     if (!botStream || onFace) return;
     face.audioCtx.createMediaStreamSource(botStream).connect(face.audioAnalyzerNode);
-    // Old Chrome only feeds remote tracks to Web Audio once an element touches them.
+    // Chrome only feeds a remote track to Web Audio while an element plays it, so mute rather than remove.
     if (playEl) playEl.muted = true;
     onFace = true;
   }
-  function attachPendingAudio(face: Head) {
+
+  function attachPendingAudio(face: Head): void {
     if (!botStream) return;
     face.start();
     void face.audioCtx.resume().then(() => {
       if (face.audioCtx.state === "running") moveAudioToFace(face);
     });
   }
-  // Browsers only start audio on a user gesture: any tap in the panel unlocks it.
+
+  // Browsers start audio only after a user gesture: any tap in the panel unlocks it.
   panel.addEventListener("pointerdown", () => {
-    if (head && head.audioCtx.state !== "running") void head.audioCtx.resume().then(() => head && moveAudioToFace(head));
+    const face = head;
+    if (face && face.audioCtx.state !== "running") void face.audioCtx.resume().then(() => moveAudioToFace(face));
   });
 
-  async function connect(withMic: boolean) {
+  async function fetchIceServers(): Promise<RTCIceServer[] | null> {
+    try {
+      const res = await fetch(`${personaUrl}/ice-servers`);
+      if (!res.ok) throw new Error(`ICE configuration ${res.status}`);
+      return ((await res.json()) as { iceServers: RTCIceServer[] }).iceServers;
+    } catch (err) {
+      console.error("[openfolio]", err);
+      return null;
+    }
+  }
+
+  function createClient(withMic: boolean, iceServers: RTCIceServer[], gen: number): PipecatClient {
+    // Own media manager: the default one loads a script from Daily's CDN.
+    const media = new LocalMediaManager();
+    const transport = new SmallWebRTCTransport({ mediaManager: media as never, iceServers });
+    // A call started by typing has no mic track; turning the mic on later swaps one in.
+    media.onLocalTrack = async (track) => {
+      const sender = (
+        transport as unknown as { getAudioTransceiver?: () => RTCRtpTransceiver | undefined }
+      ).getAudioTransceiver?.()?.sender;
+      await sender?.replaceTrack(track);
+    };
+    return new PipecatClient({
+      transport,
+      enableMic: withMic,
+      enableCam: false,
+      callbacks: {
+        onDeviceError: () => {
+          muted = true;
+          setMicLook();
+          setState(client ? "ready" : "idle");
+          showNotice("Microphone unavailable", "Allow microphone access to talk, or switch to Chat to type.");
+        },
+        onTrackStarted: (track, participant) => {
+          if (track.kind !== "audio") return;
+          if (participant?.local) watchMicLevel(track);
+          else routeBotAudio(new MediaStream([track]));
+        },
+        onUserStartedSpeaking: () => setState("listening"),
+        onUserStoppedSpeaking: () => setState("thinking"),
+        onBotStartedSpeaking: () => setState("speaking"),
+        onBotStoppedSpeaking: () => setState(muted ? "ready" : "listening"),
+        onBotLlmStarted: streamStart,
+        onBotLlmStopped: () => {
+          if (muted) setState("ready");
+        },
+        onBotLlmText: (d) => {
+          if (d.text) streamText(d.text);
+        },
+        onUserTranscript: (d: TranscriptData) => {
+          const text = d.text.trim();
+          if (text) userSaid(text, d.final);
+        },
+        onBotOutput: (
+          d: BotOutputData & { segment_id?: string | number; spoken_progress?: Record<string, string> },
+        ) => {
+          if ((d.text_type ?? d.aggregated_by) !== "sentence") return;
+          const p = d.spoken_progress;
+          const full = (p ? `${p.accumulated_text ?? ""}${p.remaining_text ?? ""}` : d.text).trim();
+          if (full) botSaid(full, d.segment_id);
+        },
+        onServerMessage,
+        onError: (e: RTVIMessage) => {
+          const data = (e.data ?? {}) as { message?: string; error?: string; fatal?: boolean };
+          const raw = String(data.message || data.error || "");
+          console.warn("[openfolio]", e);
+          if (!isSeriousError(raw, Boolean(data.fatal))) return;
+          if (showDetails) logLine(`Error: ${raw}`, "note");
+          const { title, body } = explainProviderError(raw);
+          showNotice(
+            title,
+            showDetails ? body : "Something went wrong on our side. Try again in a moment.",
+            showDetails ? raw : undefined,
+            true,
+          );
+        },
+        onDisconnected: () => {
+          if (gen !== generation) return;
+          const reason = endedReason;
+          teardown();
+          showHint(END_HINTS[reason]);
+          logLine(reason === "idle" ? "Call ended because it went quiet" : "Call ended", "note");
+        },
+      },
+    });
+  }
+
+  async function connect(withMic: boolean): Promise<void> {
     if (client) return;
     if (connecting) return connecting;
-    const generation = connectionGeneration;
+    const gen = generation;
     connecting = (async () => {
       setState("connecting");
       endedReason = "";
-      cardSheet.el.classList.remove("open");
-      const face = head;
-      if (face) {
-        face.start();
-        if (face.audioCtx.state !== "running") await face.audioCtx.resume().catch(() => {});
+      if (head) {
+        head.start();
+        if (head.audioCtx.state !== "running") await head.audioCtx.resume().catch(() => undefined);
       }
-      // Our own media manager: the default one loads a script from Daily's CDN.
-      const media = new LocalMediaManager();
-      let iceServers: RTCIceServer[];
-      try {
-        const iceResponse = await fetch(`${opts.server}/v1/personas/${encodeURIComponent(opts.persona)}/ice-servers`);
-        if (!iceResponse.ok) throw new Error(`ICE configuration ${iceResponse.status}`);
-        ({ iceServers } = await iceResponse.json());
-      } catch {
+      const iceServers = await fetchIceServers();
+      if (!iceServers) {
         setState("idle");
         showNotice("Couldn't connect", "Couldn't load connection settings. Try again in a moment.");
         return;
       }
-      const transport = new SmallWebRTCTransport({ mediaManager: media as any, iceServers });
-      // A call started by typing has no mic; turning it on later swaps it in.
-      media.onLocalTrack = (track) => (transport as any).getAudioTransceiver?.()?.sender?.replaceTrack(track);
       muted = !withMic;
-      const c = new PipecatClient({
-        transport,
-        enableMic: withMic,
-        enableCam: false,
-        callbacks: {
-          onDeviceError: () => {
-            muted = true;
-            setMicLook();
-            setState(client ? "ready" : "idle");
-            showNotice("Microphone unavailable", "Allow microphone access to talk, or switch to Chat to type.");
-          },
-          onTrackStarted: (track, participant) => {
-            if (track.kind !== "audio") return;
-            if (participant?.local) return watchMicLevel(track);
-            routeBotAudio(new MediaStream([track]));
-          },
-          onUserStartedSpeaking: () => setState("listening"),
-          onUserStoppedSpeaking: () => setState("thinking"),
-          onBotStartedSpeaking: () => setState("speaking"),
-          onBotStoppedSpeaking: () => setState(muted ? "ready" : "listening"),
-          onBotLlmStarted: () => streamStart(),
-          onBotLlmStopped: () => { if (muted) setState("ready"); },
-          onBotLlmText: (d: any) => { if (d?.text) streamText(d.text); },
-          onUserTranscript: (d) => { if (d.text.trim()) userSaid(d.text.trim(), d.final); },
-          onBotOutput: (d) => {
-            const kind = d.text_type ?? d.aggregated_by;
-            if (kind !== "sentence") return;
-            const p = d.spoken_progress;
-            const full = p ? `${p.accumulated_text ?? ""}${p.remaining_text ?? ""}` : d.text;
-            if (full.trim()) botSaid(full.trim(), d.segment_id);
-          },
-          onServerMessage: (m: any) => {
-            if (m?.type === "openfolio.card") showCard(m.card, m.data);
-            if (m?.type === "openfolio.ended") endedReason = String(m.reason || "");
-          },
-          onError: (e: any) => {
-            const raw = String(e?.data?.message || e?.data?.error || "");
-            console.warn("[openfolio]", e);
-            // Timing warnings from the voice are not worth interrupting anyone.
-            const serious = e?.data?.fatal || /completion|model|api key|auth|quota|rate limit|denied|invalid|reasoning/i.test(raw);
-            if (showDetails && serious) logLine(`Error: ${raw}`, "note");
-            if (!serious) return;
-            const { title, body } = explain(raw);
-            showNotice(title, showDetails ? body : "Something went wrong on our side. Try again in a moment.", showDetails ? raw : undefined, true);
-          },
-          onDisconnected: () => {
-            if (generation !== connectionGeneration) return;
-            const reason = endedReason;
-            teardown();
-            if (reason === "idle") showHint("The call ended because it went quiet. Ask anything to start again.");
-            else if (reason === "turn_limit") showHint("That's the end of this call. Start a new one anytime.");
-            else showHint("Call ended. Ask anything to start again.");
-            logLine(reason === "idle" ? "Call ended because it went quiet" : "Call ended", "note");
-          },
-        },
-      });
+      const c = createClient(withMic, iceServers, gen);
       try {
-        await c.connect({ webrtcRequestParams: { endpoint: `${opts.server}/v1/personas/${encodeURIComponent(opts.persona)}/offer` } });
-        if (generation !== connectionGeneration) { await c.disconnect(); return; }
+        await c.connect({ webrtcRequestParams: { endpoint: `${personaUrl}/offer` } });
+        if (gen !== generation) {
+          await c.disconnect();
+          return;
+        }
         client = c;
-        if (chatOpen) { muted = true; textOnly = true; c.enableMic(false); updateAudioMode(); }
+        if (chatOpen) {
+          muted = true;
+          textOnly = true;
+          c.enableMic(false);
+          updateAudioMode();
+        }
         setMicLook();
         setState("listening");
-      } catch (err: any) {
-        if (generation !== connectionGeneration) { try { await c.disconnect(); } catch {} return; }
+      } catch (err) {
+        await c.disconnect().catch(() => undefined);
+        if (gen !== generation) return;
         console.error("[openfolio]", err);
-        const msg = String(err?.message || err || "");
+        const raw = String((err as Error | undefined)?.message ?? err ?? "");
+        const { title, body } = explainConnectError(raw);
         setState("idle");
-        if (/503/.test(msg)) showNotice("All lines are busy", "Try again in a minute.");
-        else if (/429/.test(msg)) showNotice("Too many calls", "This network started several calls recently. Try again in a few minutes.");
-        else if (/Permission|NotAllowed/i.test(msg)) showNotice("Microphone is blocked", "Allow microphone access to talk, or tap the keyboard to type instead.");
-        else showNotice("Couldn't connect", "Check your connection and try again.", showDetails ? msg : undefined);
-        try { await c.disconnect(); } catch {}
-      } finally {
-        connecting = null;
+        showNotice(title, body, showDetails ? raw : undefined);
       }
     })();
-    try { await connecting; } finally { connecting = null; }
+    try {
+      await connecting;
+    } finally {
+      connecting = null;
+    }
   }
 
-  function setMicLook() {
+  function setMicLook(): void {
     micBtn.classList.toggle("muted", muted);
     micBtn.setAttribute("aria-label", muted ? "Turn on microphone" : "Mute microphone");
     micBtn.replaceChildren(h("span", { class: "ring" }), icon(muted ? "micOff" : "mic"));
   }
 
-  function teardown() {
-    connectionGeneration++;
+  function teardown(): void {
+    generation++;
     client = null;
-    levelStop?.();
-    levelStop = null;
+    stopLevel?.();
+    stopLevel = null;
     playEl?.pause();
     playEl = null;
     botStream = null;
@@ -569,14 +627,14 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     setState("idle");
   }
 
-  async function hangUp() {
+  async function hangUp(): Promise<void> {
     const c = client;
     teardown();
     showHint("Call ended. Tap Talk to start again.");
-    try { await c?.disconnect(); } catch {}
+    await c?.disconnect().catch(() => undefined);
   }
 
-  async function ask(text: string) {
+  async function ask(text: string): Promise<void> {
     const q = text.trim();
     if (!q) return;
     setChat(true);
@@ -584,7 +642,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     hideNotice();
     input.value = "";
     userSaid(q, true);
-    // Typing never asks for the microphone; the mic button turns it on later.
+    // Typing never asks for the microphone; the mic button adds voice later.
     if (!client) await connect(false);
     if (!client) return;
     setState("thinking");
@@ -596,29 +654,55 @@ export async function mount(root: ShadowRoot, opts: MountOptions) {
     }
   }
 
-  // ---- controls -----------------------------------------------------------
-  startBtn.addEventListener("click", () => {
-    hideNotice();
-    textOnly = false; updateAudioMode();
-    if (client) { muted = false; client.enableMic(true); setMicLook(); setState("listening"); }
-    else void connect(true);
-  });
-  endBtn.addEventListener("click", () => void hangUp());
-  micBtn.addEventListener("click", () => {
-    muted = !muted;
-    if (!muted) { textOnly = false; updateAudioMode(); }
-    client?.enableMic(!muted);
-    setMicLook();
-    setState(muted ? "ready" : "listening");
-  });
-  closeBtn.addEventListener("click", async () => {
-    await hangUp();
+  function close(): void {
+    // Remove the panel first so a slow disconnect never keeps it on screen.
+    life.abort();
     head?.stop();
     style.remove();
     panel.remove();
     opts.onClose?.();
-  });
+    void hangUp();
+  }
 
-  void faceReady;
+  // ---- controls -------------------------------------------------------------
+  startBtn.addEventListener("click", () => {
+    hideNotice();
+    textOnly = false;
+    updateAudioMode();
+    if (!client) {
+      void connect(true);
+      return;
+    }
+    muted = false;
+    client.enableMic(true);
+    setMicLook();
+    setState("listening");
+  });
+  micBtn.addEventListener("click", () => {
+    muted = !muted;
+    if (!muted) {
+      textOnly = false;
+      updateAudioMode();
+    }
+    client?.enableMic(!muted);
+    setMicLook();
+    setState(muted ? "ready" : "listening");
+  });
+  voiceSwitch.addEventListener("click", () => {
+    setChat(false);
+    (startBtn.hidden ? micBtn : startBtn).focus();
+  });
+  chatSwitch.addEventListener("click", () => setChat(true));
+  endBtn.addEventListener("click", () => void hangUp());
+  chatEndBtn.addEventListener("click", () => void hangUp());
+  closeBtn.addEventListener("click", close);
+  if (opts.mode === "bubble") {
+    panel.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") close();
+    });
+  }
+
+  setMicLook();
   setState("idle");
+  (opts.mode === "bubble" ? startBtn : null)?.focus();
 }

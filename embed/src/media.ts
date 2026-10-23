@@ -1,13 +1,12 @@
 /**
- * A minimal media manager for SmallWebRTCTransport.
- *
- * The transport's default manager is built on Daily's call object, which loads
- * a script from Daily's CDN at runtime. Openfolio must work self-hosted and
- * without third-party calls, so this one uses getUserMedia directly. It only
- * handles the microphone; Openfolio never sends video.
+ * Microphone-only media manager for SmallWebRTCTransport.
+ * The default manager loads Daily's SDK from a CDN; this one uses getUserMedia, so no third-party requests.
  */
 
-type Callbacks = { onTrackStarted?: (track: MediaStreamTrack, participant?: unknown) => void };
+type Callbacks = {
+  onTrackStarted?: (track: MediaStreamTrack, participant?: unknown) => void;
+  onDeviceError?: (error: unknown) => void;
+};
 
 export class LocalMediaManager {
   private _options: unknown = null;
@@ -54,7 +53,7 @@ export class LocalMediaManager {
     if (this._micEnabled) await this.acquire();
   }
   async disconnect() {
-    this.stream?.getTracks().forEach((t) => t.stop());
+    for (const t of this.stream?.getTracks() ?? []) t.stop();
     this.stream = null;
     this.micTrack = null;
   }
@@ -87,13 +86,13 @@ export class LocalMediaManager {
       this.micTrack.enabled = enable;
       return;
     }
-    // A call that started from typing has no mic yet: ask for it now.
+    // A call started by typing has no mic yet: ask for it now.
     if (enable) {
       void this.acquire()
         .then(() => this.micTrack && this.onLocalTrack?.(this.micTrack))
         .catch((err) => {
           this._micEnabled = false;
-          (this._callbacks as any).onDeviceError?.(err);
+          this._callbacks.onDeviceError?.(err);
         });
     }
   }

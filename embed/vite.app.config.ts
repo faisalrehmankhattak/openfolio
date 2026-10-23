@@ -1,5 +1,5 @@
-import { defineConfig } from "vite";
 import { copyFileSync, mkdirSync } from "node:fs";
+import { defineConfig } from "vite";
 
 const HEADAUDIO = "node_modules/@met4citizen/headaudio/dist";
 

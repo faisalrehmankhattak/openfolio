@@ -7,7 +7,6 @@
 **/.pytest_cache
 embed/dist
 avatars/*
-!avatars/README.md
 !avatars/LICENSE-readyplayerme.txt
 data
 .transfer-done

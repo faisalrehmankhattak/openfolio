@@ -1,0 +1,64 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --group dev --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pytest -q
+
+  widget:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: embed
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: embed/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+
+  docker:
+    needs: [worker, widget]
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: cp .env.example .env
+      - run: uv sync --project worker --group dev --frozen
+      - run: docker compose config --quiet
+      - run: docker build -t openfolio:local .
+      - run: ./scripts/docker-smoke.sh
+      - run: ./scripts/docker-webrtc-smoke.sh
