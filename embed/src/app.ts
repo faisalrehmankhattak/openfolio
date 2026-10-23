@@ -93,7 +93,44 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     ...info.quick_questions.map((q) => h("button", { type: "button", onclick: () => void ask(q.question) }, q.label)),
   );
 
+  const initial = first.slice(0, 1).toUpperCase();
   const chatLog = h("div", { class: "sheet-body", role: "log", "aria-live": "polite" });
+  const welcome = h(
+    "div",
+    { class: "welcome" },
+    h(
+      "div",
+      { class: "welcome-inner" },
+      h("div", { class: "mono", "data-initial": initial, "aria-hidden": "true" }),
+      h("h2", {}, `Ask ${first} anything`),
+      info.tagline ? h("p", {}, info.tagline) : null,
+      h(
+        "div",
+        { class: "starters" },
+        ...info.quick_questions.map((q) =>
+          h(
+            "button",
+            { type: "button", onclick: () => void ask(q.question) },
+            h("b", {}, q.label),
+            h("span", {}, q.question),
+          ),
+        ),
+      ),
+    ),
+  );
+  const quick = h(
+    "div",
+    { class: "quick", hidden: true },
+    ...info.quick_questions.map((q) =>
+      h("button", { type: "button", title: q.question, onclick: () => void ask(q.question) }, q.label),
+    ),
+  );
+  const typing = h(
+    "div",
+    { class: "typing", "data-initial": initial },
+    h("span", { class: "sr" }, `${first} is typing`),
+    h("span", { class: "dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")),
+  );
   const startBtn = h("button", { class: "start", type: "button" }, icon("mic"), h("span", {}, `Talk to ${first}`));
   const startLabel = startBtn.lastChild as HTMLSpanElement;
   const micBtn = h("button", { class: "mic", type: "button", hidden: true, "aria-label": "Mute microphone" });
@@ -102,7 +139,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     { class: "side end", type: "button", "aria-label": "End call", hidden: true },
     icon("end"),
   );
-  const chatEndBtn = h("button", { class: "chat-end", type: "button", hidden: true }, "End session");
+  const chatEndBtn = h("button", { class: "chat-end", type: "button", hidden: true }, "End chat");
   const voiceSwitch = h(
     "button",
     { class: "side voice-switch", type: "button", "aria-label": "Switch to voice", title: "Switch to voice" },
@@ -120,7 +157,12 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     maxlength: "500",
     enterkeyhint: "send",
   });
-  const sendBtn = h("button", { class: "side send", type: "submit", "aria-label": "Send" }, icon("send"));
+  const sendBtn = h("button", { class: "side send", type: "submit", "aria-label": "Send", disabled: true }, icon("up"));
+  // An empty input disables Send, which also blocks Enter (implicit submission skips a disabled default button).
+  const syncSend = (): void => {
+    sendBtn.disabled = !input.value.trim();
+  };
+  input.addEventListener("input", syncSend);
   const typeRow = h(
     "form",
     {
@@ -135,7 +177,21 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     input,
     sendBtn,
   );
-  const chatPane = h("section", { class: "chat-pane", "aria-label": "Chat" }, chatLog, typeRow, chatEndBtn);
+  const chatFoot = h(
+    "div",
+    { class: "chat-foot" },
+    h("span", {}, `AI version of ${first}. It can make mistakes.`),
+    chatEndBtn,
+  );
+  const chatPane = h(
+    "section",
+    { class: "chat-pane", "aria-label": "Chat" },
+    welcome,
+    chatLog,
+    quick,
+    typeRow,
+    chatFoot,
+  );
   const controls = h(
     "div",
     { class: "controls" },
@@ -161,22 +217,61 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
         setMicLook();
       }
       input.focus();
+      chatLog.scrollTop = chatLog.scrollHeight;
     }
     if (state === "listening" || state === "ready") setState("ready");
   }
 
   // ---- transcript and captions ---------------------------------------------
-  type Turn = { el: HTMLElement; segments: Map<string, string> };
+  type Turn = { el: HTMLElement; text: HTMLElement; segments: Map<string, string> };
   let botTurn: Turn | null = null;
   let streaming = false;
   let streamBuf = "";
   let lastQuestion = "";
+  // Cards usually arrive before the reply text; the text is placed above them so each answer reads text first.
+  let turnCards: HTMLElement[] = [];
 
-  function logLine(text: string, kind: "user" | "bot" | "note"): HTMLElement {
-    const el = h("p", { class: `line ${kind}` }, text);
-    chatLog.append(el);
-    chatLog.scrollTop = chatLog.scrollHeight;
-    return el;
+  /** Runs a change to the log and keeps the newest message in view, unless the visitor scrolled up to read. */
+  function follow(change: () => void, force = false): void {
+    const stick = force || chatLog.scrollHeight - chatLog.scrollTop - chatLog.clientHeight < 72;
+    change();
+    if (stick) chatLog.scrollTop = chatLog.scrollHeight;
+  }
+
+  // The typing dots always stay last, so new entries go above them.
+  function addToLog(el: HTMLElement): void {
+    if (!welcome.hidden) {
+      welcome.hidden = true;
+      quick.hidden = false;
+      chatPane.classList.add("started");
+    }
+    follow(() => chatLog.insertBefore(el, typing.isConnected ? typing : null));
+  }
+
+  function logNote(text: string): void {
+    addToLog(h("p", { class: "line note" }, text));
+  }
+
+  function botLine(): Turn {
+    const text = h("span", { class: "txt" });
+    const el = h("p", { class: "line bot", "data-initial": initial }, h("span", { class: "sr" }, `${first}: `), text);
+    const firstCard = turnCards.find((c) => c.isConnected);
+    turnCards = [];
+    if (firstCard) follow(() => chatLog.insertBefore(el, firstCard));
+    else addToLog(el);
+    return { el, text, segments: new Map() };
+  }
+
+  function showTyping(): void {
+    follow(() => chatLog.append(typing), true);
+  }
+
+  function hideTyping(): void {
+    typing.remove();
+  }
+
+  function stopCaret(): void {
+    for (const el of chatLog.querySelectorAll(".streaming")) el.classList.remove("streaming");
   }
 
   function showHint(text: string): void {
@@ -197,6 +292,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
 
   // Errors become a short notice in plain words; raw details only on the owner's machine.
   function showNotice(title: string, body: string, details?: string, canRetry = false): void {
+    hideTyping();
     const dismiss = h(
       "button",
       { class: "x", type: "button", "aria-label": "Dismiss", onclick: hideNotice },
@@ -244,8 +340,9 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
   function userSaid(text: string, final: boolean): void {
     capUser.textContent = text;
     if (!final) return;
-    logLine(`You: ${text}`, "user");
+    addToLog(h("p", { class: "line user" }, h("span", { class: "sr" }, "You: "), text));
     botTurn = null;
+    turnCards = [];
     if (!muted && isHangUp(text)) void hangUp();
   }
 
@@ -253,15 +350,20 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
   // segment id; keep one entry per segment.
   function botSaid(text: string, segmentId?: string | number): void {
     if (streaming) return;
-    botTurn ??= { el: logLine("", "bot"), segments: new Map() };
-    botTurn.segments.set(segmentId === undefined ? `t:${text}` : `s:${segmentId}`, text);
-    const sentences = [...botTurn.segments.values()];
-    botTurn.el.textContent = `${first}: ${sentences.join(" ")}`;
+    hideTyping();
+    botTurn ??= botLine();
+    const turn = botTurn;
+    turn.segments.set(segmentId === undefined ? `t:${text}` : `s:${segmentId}`, text);
+    const sentences = [...turn.segments.values()];
+    follow(() => {
+      turn.text.textContent = sentences.join(" ");
+    });
     setCaption(sentences.slice(-2).join(" "));
   }
 
   // Captions follow the model's text as it streams, ahead of the voice.
   function streamStart(): void {
+    stopCaret();
     streaming = false;
     streamBuf = "";
     botTurn = null;
@@ -273,9 +375,13 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
   function streamText(chunk: string): void {
     streaming = true;
     streamBuf += chunk;
-    botTurn ??= { el: logLine("", "bot"), segments: new Map() };
-    botTurn.el.textContent = `${first}: ${streamBuf}`;
-    chatLog.scrollTop = chatLog.scrollHeight;
+    hideTyping();
+    botTurn ??= botLine();
+    const turn = botTurn;
+    follow(() => {
+      turn.text.textContent = streamBuf;
+      turn.el.classList.add("streaming");
+    });
     setCaption(lastSentences(streamBuf));
   }
 
@@ -287,8 +393,9 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     }
     const card = renderCard(m, first);
     if (!card) return;
-    chatLog.append(h("section", { class: "chat-card" }, h("h3", {}, card.title), card.body));
-    chatLog.scrollTop = chatLog.scrollHeight;
+    const el = h("section", { class: `chat-card ${card.kind}` }, h("h3", {}, card.title), card.body);
+    if (!botTurn) turnCards.push(el);
+    addToLog(el);
   }
 
   // ---- face -----------------------------------------------------------------
@@ -514,6 +621,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
         onBotStoppedSpeaking: () => setState(muted ? "ready" : "listening"),
         onBotLlmStarted: streamStart,
         onBotLlmStopped: () => {
+          stopCaret();
           if (muted) setState("ready");
         },
         onBotLlmText: (d) => {
@@ -537,7 +645,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
           const raw = String(data.message || data.error || "");
           console.warn("[openfolio]", e);
           if (!isSeriousError(raw, Boolean(data.fatal))) return;
-          if (showDetails) logLine(`Error: ${raw}`, "note");
+          if (showDetails) logNote(`Error: ${raw}`);
           const { title, body } = explainProviderError(raw);
           showNotice(
             title,
@@ -551,7 +659,7 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
           const reason = endedReason;
           teardown();
           showHint(END_HINTS[reason]);
-          logLine(reason === "idle" ? "Call ended because it went quiet" : "Call ended", "note");
+          logNote(reason === "idle" ? "Call ended because it went quiet" : "Call ended");
         },
       },
     });
@@ -612,7 +720,10 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
           timer = window.setTimeout(() => reject(new Error("Connection timed out")), CONNECT_TIMEOUT_MS);
         });
         try {
-          await Promise.race([c.connect({ webrtcRequestParams: { endpoint: `${personaUrl}/offer` } }), timeout]);
+          await Promise.race([
+            c.connect({ webrtcRequestParams: { endpoint: `${personaUrl}/offer${withMic ? "" : "?greet=0"}` } }),
+            timeout,
+          ]);
         } finally {
           clearTimeout(timer);
         }
@@ -662,6 +773,8 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     botStream = null;
     onFace = false;
     streaming = false;
+    hideTyping();
+    stopCaret();
     setState("idle");
   }
 
@@ -678,8 +791,11 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
     setChat(true);
     lastQuestion = q;
     hideNotice();
-    input.value = "";
+    // A starter or chip click leaves an unsent draft alone.
+    if (input.value.trim() === q) input.value = "";
+    syncSend();
     userSaid(q, true);
+    showTyping();
     // Typing never asks for the microphone; the mic button adds voice later.
     if (!client) await connect(false);
     if (!client) return;

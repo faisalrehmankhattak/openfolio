@@ -14,6 +14,10 @@ const PATHS: Record<string, string[]> = {
   close: ["M6 6l12 12", "M18 6L6 18"],
   down: ["M6 9l6 6 6-6"],
   send: ["M5 12h13", "M13 6l6 6-6 6"],
+  up: ["M12 19V5", "M6 11l6-6 6 6"],
+  out: ["M7 17L17 7", "M9 7h8v8"],
+  mail: ["M4 6h16v12H4z", "M4 7l8 6 8-6"],
+  check: ["M5 12.5l4.5 4.5L19 7.5"],
   transcript: ["M5 6h14", "M5 11h14", "M5 16h9"],
 };
 

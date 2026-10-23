@@ -128,7 +128,7 @@ def make_llm(s: Settings, persona: Persona) -> OpenAILLMService:
 
 
 async def run_conversation(
-    connection: SmallWebRTCConnection, persona: Persona, settings: Settings, session_id: str
+    connection: SmallWebRTCConnection, persona: Persona, settings: Settings, session_id: str, greet: bool = True
 ) -> None:
     transport = SmallWebRTCTransport(
         webrtc_connection=connection,
@@ -169,6 +169,8 @@ async def run_conversation(
     @transport.event_handler("on_client_connected")
     async def on_client_connected(_transport: Any, _client: Any) -> None:
         logger.info(f"[{session_id}] visitor connected to {persona.id}")
+        if not greet:
+            return
         context.add_message(
             {
                 "role": "developer",

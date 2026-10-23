@@ -217,6 +217,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         persona = get_persona(persona_id)
         check_origin(request, persona)
         body: OfferBody = await read_json(request, OfferBody)
+        # A call started by typing already carries a question; a greeting would race it.
+        greet = request.query_params.get("greet") != "0"
 
         if not is_known_connection(body.pc_id):
             check_capacity()
@@ -228,7 +230,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
             async def run() -> None:
                 try:
-                    await run_conversation(connection, persona, settings, session_id)
+                    await run_conversation(connection, persona, settings, session_id, greet=greet)
                 except Exception:
                     logger.exception(f"[{session_id}] conversation failed")
                 finally:
