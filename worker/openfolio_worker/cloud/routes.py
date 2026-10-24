@@ -27,6 +27,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..config import Settings
 from ..registry import PersonaRegistry
+from . import profiles
 from .accounts import accounts_router
 from .admin import AdminAuth, admin_router
 from .admin_members import MemberAdmin
@@ -189,6 +190,7 @@ class CloudService:
             self._task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._task
+        profiles.unbind(self.ctx.db)
         self.ctx.db.close()
 
 
@@ -216,6 +218,7 @@ def install(
         transport=transport,
     )
     app.state.cloud = ctx
+    profiles.bind(db, cloud.public_url)  # the sitemap's list of public profiles
     admin_auth = AdminAuth(ctx)
     members = MemberAuth(ctx)
     member_admin = MemberAdmin(ctx, admin_auth)

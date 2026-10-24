@@ -394,6 +394,17 @@ class CloudDB:
             ).fetchone()
         return int(row[0])
 
+    def last_action(self, user_id: int, actions: tuple[str, ...]) -> tuple[str, int] | None:
+        """The most recent of these actions for one member, as (action, at)."""
+        marks = ", ".join("?" * len(actions))
+        with self._lock:
+            row = self._conn.execute(
+                f"SELECT action, at FROM audit_log WHERE user_id = ? AND action IN ({marks}) "  # noqa: S608
+                "ORDER BY id DESC LIMIT 1",
+                (user_id, *actions),
+            ).fetchone()
+        return (str(row[0]), int(row[1])) if row else None
+
     def revoke_session(self, sid: str, expires_at: int) -> None:
         with self._tx() as c:
             c.execute("INSERT OR IGNORE INTO revoked_sessions (sid, expires_at) VALUES (?, ?)", (sid, expires_at))

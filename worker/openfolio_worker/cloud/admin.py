@@ -55,6 +55,7 @@ AUDIT_LABELS = {
     "file.uploaded": "File uploaded",
     "file.rejected": "Upload refused",
     "file.deleted": "File deleted",
+    "draft.started": "AI draft started",
     "draft.created": "AI draft",
     "draft.failed": "AI draft failed",
     "persona.saved": "Profile saved",

@@ -225,8 +225,8 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
         persona, private = await get_persona(request, persona_id)
         if private:
             cache = "private, no-store"
-        else:  # a member's page can be paused, so their profile is cached briefly
-            cache = "public, max-age=60" if registry.is_dynamic(persona_id) else "public, max-age=300"
+        else:  # a member's page can be paused, so their profile is cached only briefly
+            cache = "public, max-age=15" if registry.is_dynamic(persona_id) else "public, max-age=300"
         return JSONResponse(persona.public_view(), headers={"Cache-Control": cache})
 
     @app.get("/v1/personas/{persona_id}/ice-servers")

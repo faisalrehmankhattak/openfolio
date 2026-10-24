@@ -11,6 +11,7 @@ which escapes <, > and &, so a name such as "</script>" stays inert.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import Any
 
@@ -25,6 +26,22 @@ from .web import CloudContext
 
 _PHOTO = re.compile(r"photo-(\d{1,12})\.jpg")
 DESCRIPTION_CHARS = 160
+# Pages may be stored but are revalidated on every view (an ETag makes that a cheap 304), so a
+# pause, a rejection or a deletion takes effect at once instead of after a cache lifetime.
+PAGE_CACHE = "public, no-cache"
+# The approved photo is immutable under its URL; a short lifetime bounds how long a copy outlives
+# a pause or deletion in browsers and shared caches.
+PHOTO_CACHE = "public, max-age=300"
+
+
+def revalidated(request: Request, response: Response) -> Response:
+    """Add an ETag from the body and answer 304 when the browser already has this version."""
+    tag = '"' + hashlib.sha256(bytes(response.body)).hexdigest()[:32] + '"'
+    if tag in request.headers.get("if-none-match", ""):
+        keep = {k: v for k, v in response.headers.items() if k.lower() in ("cache-control", "x-robots-tag")}
+        return Response(status_code=304, headers={**keep, "ETag": tag})
+    response.headers["ETag"] = tag
+    return response
 
 
 def _description(persona: Persona) -> str:
@@ -149,15 +166,16 @@ def public_router(ctx: CloudContext, members: MemberAuth, owner_signed_in: Any) 
             return not_found(request)
         persona, data, listed = found
         page_url = f"{ctx.cloud.public_url}/p/{handle}"
-        headers = {"Cache-Control": "public, max-age=60"}
+        headers = {"Cache-Control": PAGE_CACHE}
         if not listed:
             headers["X-Robots-Tag"] = "noindex"
         if name.endswith(".md"):
-            return PlainTextResponse(
-                markdown(persona, page_url), media_type="text/markdown; charset=utf-8", headers=headers
-            )
+            text = markdown(persona, page_url)
+            md = PlainTextResponse(text, media_type="text/markdown; charset=utf-8", headers=headers)
+            return revalidated(request, md)
         context = profile_context(ctx, persona, data, show_in_search=listed)
-        return ctx.render(request, "profile_page.html", csp=ctx.widget_csp, headers=headers, csrf="", **context)
+        page = ctx.render(request, "profile_page.html", csp=ctx.widget_csp, headers=headers, csrf="", **context)
+        return revalidated(request, page)
 
     @router.get("/p/{handle}/{asset}")
     async def photo(request: Request, handle: str, asset: str) -> Response:
@@ -180,7 +198,7 @@ def public_router(ctx: CloudContext, members: MemberAuth, owner_signed_in: Any) 
         path = ctx.files.path(record.user_id, stored.stored_name)
         if not path.exists():
             return not_found(request)
-        cache = "public, max-age=3600" if public else "private, no-store"
+        cache = PHOTO_CACHE if public else "private, no-store"
         return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": cache})
 
     async def _may_preview(request: Request, user_id: int, handle: str) -> bool:

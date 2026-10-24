@@ -6,6 +6,11 @@ POST /studio/files/{id}/delete
 POST /studio/text                  pasted text, kept as a text document
 POST /studio/draft                 start the AI draft in the background
 GET  /studio/draft/status          JSON progress for the setup page
+
+Draft jobs live in this process's memory, which is right for the single replica Openfolio Cloud
+runs on. The audit log records "draft.started" before a job runs, so after a restart (or on another
+replica) a draft that never finished shows as interrupted, with a button to run it again, instead
+of spinning forever. Running several replicas would need a shared job store.
 """
 
 from __future__ import annotations
@@ -41,8 +46,16 @@ if TYPE_CHECKING:
     from .studio import Studio
 
 PASTE_MAX_CHARS = 40_000
-DRAFTS_PER_HOUR = 6
+DRAFTS_PER_HOUR = 6  # counted from "draft.started", so failed drafts count too (each one is an LLM call)
 DRAFTS_PER_DAY = 20
+INTERRUPTED_SECONDS = 3600  # how long a draft lost in a restart is reported before it's forgotten
+DRAFT_EVENTS = ("draft.started", "draft.created", "draft.failed")
+INTERRUPTED = {
+    "state": "interrupted",
+    "step": "",
+    "label": "",
+    "error": "The draft was interrupted because the server restarted. Your documents are safe; run it again.",
+}
 UPLOADS_PER_HOUR = 40
 STEPS = {
     "reading": "Reading your documents",
@@ -112,7 +125,7 @@ def add_setup_routes(router: APIRouter, studio: Studio) -> None:
         current = (record.data.get("avatar") or {}).get("photo")
         photo = next((f for f in photos if photo_path(user.handle, f.id) == current), None)
         count, used = await db.run(store.usage, user.id)
-        job = jobs.get(user.id)
+        job = await job_view(user.id)
         return await studio.render(
             request,
             signed,
@@ -124,9 +137,19 @@ def add_setup_routes(router: APIRouter, studio: Studio) -> None:
             photo=photo,
             photo_url=f"/{current}" if photo and current else None,
             usage={"count": count, "bytes": used, "max_files": MAX_FILES, "max_bytes": MAX_TOTAL_BYTES},
-            job=job.view() if job else None,
+            job=job,
             error=error,
         )
+
+    async def job_view(user_id: int) -> dict[str, str | None] | None:
+        """This process's job, or "interrupted" when the log shows a draft that started and never ended."""
+        job = jobs.get(user_id)
+        if job is not None:
+            return job.view()
+        last = await db.run(db.last_action, user_id, DRAFT_EVENTS)
+        if last and last[0] == "draft.started" and ctx.now() - last[1] < INTERRUPTED_SECONDS:
+            return dict(INTERRUPTED)
+        return None
 
     @router.get("/studio/setup")
     async def setup(request: Request) -> Response:
@@ -301,6 +324,7 @@ def add_setup_routes(router: APIRouter, studio: Studio) -> None:
         except Exception:
             logger.exception(f"Draft for user {user.id} crashed")
             job.state, job.error = "failed", "Something went wrong while drafting. Please try again."
+            await db.run(db.audit, "draft.failed", now=ctx.now(), ip_hash=ip_hash, user_id=user.id, detail="crash")
 
     @router.post("/studio/draft")
     async def start_draft(request: Request) -> Response:
@@ -314,17 +338,19 @@ def add_setup_routes(router: APIRouter, studio: Studio) -> None:
         current = jobs.get(user.id)
         if current and current.state == "running":
             return RedirectResponse("/studio/setup?m=draft_running", status_code=303)
-        recent_hour = await db.run(db.actions_since, "draft.created", now - 3600, user_id=user.id)
-        recent_day = await db.run(db.actions_since, "draft.created", now - 86_400, user_id=user.id)
+        recent_hour = await db.run(db.actions_since, "draft.started", now - 3600, user_id=user.id)
+        recent_day = await db.run(db.actions_since, "draft.started", now - 86_400, user_id=user.id)
         if recent_hour >= DRAFTS_PER_HOUR or recent_day >= DRAFTS_PER_DAY:
             return RedirectResponse("/studio/setup?m=draft_limit", status_code=303)
         documents = await db.run(store.list_files, user.id, "document")
         sources = [Source(f.original_name, f.text) for f in documents if f.text.strip()]
         if not sources:
             return RedirectResponse("/studio/setup?m=no_sources", status_code=303)
+        ip_hash = ctx.ip_hash(request)
+        await db.run(db.audit, "draft.started", now=now, ip_hash=ip_hash, user_id=user.id)
         job = DraftJob()
         jobs[user.id] = job
-        job.task = asyncio.create_task(run_draft(job, signed, sources, ctx.ip_hash(request)))
+        job.task = asyncio.create_task(run_draft(job, signed, sources, ip_hash))
         return RedirectResponse("/studio/setup#draft", status_code=303)
 
     @router.get("/studio/draft/status")
@@ -332,5 +358,5 @@ def add_setup_routes(router: APIRouter, studio: Studio) -> None:
         signed = await studio.signed_in(request)
         if isinstance(signed, Response):
             return JSONResponse({"state": "signed_out"}, status_code=401)
-        job = jobs.get(signed.user.id)
-        return JSONResponse(job.view() if job else {"state": "none"}, headers={"Cache-Control": "no-store"})
+        job = await job_view(signed.user.id)
+        return JSONResponse(job or {"state": "none"}, headers={"Cache-Control": "no-store"})

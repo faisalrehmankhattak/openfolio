@@ -22,9 +22,10 @@
 {% endif %}
 
 {% if job %}
-<section class="panel draft-progress{% if job.state == 'failed' %} is-failed{% elif job.state == 'done' %} is-done{% endif %}" id="draft" aria-live="polite"{% if running %} data-draft-status="/studio/draft/status"{% endif %}>
-  {% if job.state == "failed" %}
-    <div class="dp-head"><span class="dp-icon dp-icon-error">{{ icon("alert", 22) }}</span><div><h2>The draft didn't work</h2><p class="muted">{{ job.error }}</p></div></div>
+<section class="panel draft-progress{% if job.state in ('failed', 'interrupted') %} is-failed{% elif job.state == 'done' %} is-done{% endif %}" id="draft" aria-live="polite"{% if running %} data-draft-status="/studio/draft/status"{% endif %}>
+  {% if job.state in ("failed", "interrupted") %}
+    <div class="dp-head"><span class="dp-icon dp-icon-error">{{ icon("alert", 22) }}</span><div><h2>{{ "The draft was interrupted" if job.state == "interrupted" else "The draft didn't work" }}</h2><p class="muted">{{ job.error }}</p></div>
+    {% if has_docs %}<form method="post" action="/studio/draft"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primary" type="submit">{{ icon("sparkle", 16) }} Run it again</button></form>{% endif %}</div>
   {% elif job.state == "done" %}
     <div class="dp-head"><span class="dp-icon dp-icon-ok">{{ icon("check", 22) }}</span><div><h2>Your draft is ready</h2><p class="muted">Check every fact before you submit it. Nothing is public yet.</p></div>
     <a class="btn btn-primary" href="/studio/profile?m=drafted">Review your profile {{ icon("arrow", 16) }}</a></div>
