@@ -38,7 +38,10 @@ RESETS_PER_HOUR = 5
 LOGIN_ERROR = "That email and password don't match."
 PAUSED_ERROR = "Your account is paused. Please contact the site owner."
 EXPIRED_FORM = "This form expired. Please go back, reload the page and try again."
-PRIVATE = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": "no-referrer"}
+# "same-origin", not "no-referrer": under no-referrer browsers send "Origin: null" with the page's own form
+# POST, which the origin check refuses. same-origin still keeps tokens in the URL away from other sites.
+REFERRER_POLICY = "same-origin"
+PRIVATE = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex", "Referrer-Policy": REFERRER_POLICY}
 
 
 @cache

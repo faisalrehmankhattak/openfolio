@@ -8,6 +8,7 @@ import pytest
 from openfolio_worker.cloud.profile import handle_problem
 
 from cloud_helpers import approve, client_for, login, rows, submit
+from conftest import PUBLIC_URL
 from studio_helpers import (
     PASSWORD,
     app_for,
@@ -218,6 +219,22 @@ def test_csrf_and_origin_checks_on_member_forms(app, cloud_settings):
     token = invite(cloud_settings, "new@example.com")
     assert anon.post(f"/join/{token}", data={"handle": "newbie", "password": PASSWORD}).status_code == 403
     assert db_rows(cloud_settings, "SELECT name FROM users") == [("Jane Doe",)]
+
+
+def test_signed_out_forms_keep_their_origin_in_real_browsers(app, cloud_settings):
+    """Under Referrer-Policy: no-referrer, browsers post "Origin: null" and the origin check refused every
+    join, sign-in and reset. These pages must use a policy that keeps the Origin of same-origin posts."""
+    token = invite(cloud_settings)
+    client = browser(app)
+    for path in (f"/join/{token}", "/login", "/login/forgot"):
+        assert client.get(path).headers["referrer-policy"] in ("same-origin", "strict-origin-when-cross-origin"), path
+    ours = {"origin": PUBLIC_URL}
+    data = {"form_token": form_token(client, f"/join/{token}"), "handle": "jane", "password": PASSWORD}
+    assert client.post(f"/join/{token}", data=data, headers={"origin": "null"}).status_code == 403
+    assert client.post(f"/join/{token}", data=data, headers=ours).status_code == 303
+    anon = browser(app)
+    data = {"form_token": form_token(anon, "/login"), "email": "jane@example.com", "password": PASSWORD}
+    assert anon.post("/login", data=data, headers=ours).status_code == 303
 
 
 def test_studio_requires_sign_in(app):

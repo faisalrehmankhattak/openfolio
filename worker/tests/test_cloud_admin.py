@@ -192,7 +192,7 @@ def test_invite_pages(client, cloud_settings):
     assert valid.status_code == 200
     assert "Welcome, Jane" in valid.text
     assert 'value="jane@example.com" readonly' in valid.text
-    assert valid.headers["referrer-policy"] == "no-referrer"
+    assert valid.headers["referrer-policy"] == "same-origin"  # not to other sites, and the form's Origin survives
     assert valid.headers["cache-control"] == "no-store"
     assert client.get(f"/join/{token}").status_code == 200  # creating the account consumes it; viewing does not
     old = client.get(f"/invite/{token}", follow_redirects=False)  # links emailed by stage 1

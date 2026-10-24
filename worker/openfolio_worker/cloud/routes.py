@@ -28,7 +28,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from ..config import Settings
 from ..registry import PersonaRegistry
 from . import profiles
-from .accounts import accounts_router
+from .accounts import REFERRER_POLICY, accounts_router
 from .admin import AdminAuth, admin_router
 from .admin_members import MemberAdmin
 from .auth import Keys
@@ -246,8 +246,8 @@ def install(
             response.headers.update(_NO_STORE)
             response.headers["X-Frame-Options"] = "DENY"
             if path.startswith(("/invite/", "/join/", "/login/reset/")):
-                # The token is in the URL, so links on these pages must not carry it elsewhere.
-                response.headers["Referrer-Policy"] = "no-referrer"
+                # The token is in the URL, so links on these pages must not carry it to other sites.
+                response.headers["Referrer-Policy"] = REFERRER_POLICY
         return response
 
     async def html_errors(request: Request, exc: Exception) -> Response:
