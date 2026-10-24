@@ -140,7 +140,7 @@ def test_owner_delete_erases_the_member(cloud_settings):
     uid = user_id(cloud_settings)
     act(admin, f"/admin/members/{uid}/delete")
     for table in ("users", "personas", "files", "reviews", "user_sessions", "access_requests", "invites"):
-        assert db_rows(cloud_settings, f"SELECT COUNT(*) FROM {table}") == [(0,)], table
+        assert db_rows(cloud_settings, f"SELECT COUNT(*) FROM {table}") == [(0,)], table  # noqa: S608 - fixed names
     assert not (cloud_settings.data_dir / "users" / str(uid)).exists()
     assert browser(app).get("/p/jane").status_code == 404
     assert app.state.cloud.registry.live_ids == []
