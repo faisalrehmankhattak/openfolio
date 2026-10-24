@@ -39,10 +39,10 @@ from .mail import Mailer, new_request_email
 from .member_auth import MemberAuth
 from .members import preview_hook, refresh_live
 from .public_profile import public_router as profile_router
+from .seo import install as install_seo
 from .store import StudioStore
 from .studio import Studio
 from .uploads import FileStore
-from .seo import install as install_seo
 from .web import STATIC_DIR, STRICT_CSP, CloudContext
 
 REQUESTS_PER_HOUR = 3

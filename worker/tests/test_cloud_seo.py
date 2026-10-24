@@ -230,7 +230,8 @@ def test_landing_canonical_stays_on_the_home_page_after_a_form_error(cloud_setti
 
 def test_private_and_utility_pages_are_noindex(cloud_settings):
     client = client_for(cloud_settings)
-    for path in ("/cloud/thanks", "/admin/login", "/invite/" + "a" * 43):
+    # /invite/{token} now redirects to /join/{token}, which renders the page for a bad token.
+    for path in ("/cloud/thanks", "/admin/login", "/join/" + "a" * 43, "/login"):
         html = client.get(path).text
         assert '<meta name="robots" content="noindex, nofollow">' in html, path
         assert 'rel="canonical"' not in html, path
