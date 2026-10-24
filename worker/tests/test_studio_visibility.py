@@ -223,9 +223,12 @@ def test_photo_is_public_only_while_live(cloud_settings):
     public = stranger.get(url)
     assert public.status_code == 200
     assert public.headers["content-type"] == "image/jpeg"
-    assert public.headers["cache-control"] == "public, max-age=300"
+    assert public.headers["cache-control"] == "public, no-cache"
+    tag = public.headers["etag"]
+    assert stranger.get(url, headers={"if-none-match": tag}).status_code == 304
     jane.post("/studio/publish/pause", data={"csrf": csrf(jane)})
     assert stranger.get(url).status_code == 404
+    assert stranger.get(url, headers={"if-none-match": tag}).status_code == 404
     assert stranger.get(f"/p/jane/photo-{photo_id + 1}.jpg").status_code == 404
     assert stranger.get("/p/jane/../../etc/passwd").status_code == 404
 
@@ -274,3 +277,28 @@ def test_public_pages_revalidate_so_a_pause_takes_effect_at_once(cloud_settings)
     after = stranger.get("/p/jane", headers={"if-none-match": tag})
     assert after.status_code == 404
     assert after.headers["cache-control"] == "no-store"
+
+
+def test_owner_pause_and_deletion_take_effect_at_once_on_cached_pages(cloud_settings):
+    app = app_for(cloud_settings)
+    _jane, admin = go_live(app, cloud_settings)
+    stranger = browser(app)
+    tags = {path: stranger.get(path).headers["etag"] for path in ("/p/jane", "/p/jane.md")}
+    for path, tag in tags.items():
+        cached = stranger.get(path, headers={"if-none-match": tag})
+        assert cached.status_code == 304
+        assert cached.headers["cache-control"] == "public, no-cache"
+    (user_id,) = db_rows(cloud_settings, "SELECT id FROM users WHERE handle = 'jane'")[0]
+
+    def offline():
+        for path, tag in tags.items():
+            r = stranger.get(path, headers={"if-none-match": tag})
+            assert r.status_code == 404, path
+            assert r.headers["cache-control"] == "no-store"
+
+    assert admin.post(f"/admin/members/{user_id}/pause", data={"csrf": admin_csrf(admin)}).status_code == 303
+    offline()
+    assert admin.post(f"/admin/members/{user_id}/unpause", data={"csrf": admin_csrf(admin)}).status_code == 303
+    assert stranger.get("/p/jane", headers={"if-none-match": tags["/p/jane"]}).status_code == 304
+    assert admin.post(f"/admin/members/{user_id}/delete", data={"csrf": admin_csrf(admin)}).status_code == 303
+    offline()

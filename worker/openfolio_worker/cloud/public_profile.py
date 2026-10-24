@@ -29,9 +29,8 @@ DESCRIPTION_CHARS = 160
 # Pages may be stored but are revalidated on every view (an ETag makes that a cheap 304), so a
 # pause, a rejection or a deletion takes effect at once instead of after a cache lifetime.
 PAGE_CACHE = "public, no-cache"
-# The approved photo is immutable under its URL; a short lifetime bounds how long a copy outlives
-# a pause or deletion in browsers and shared caches.
-PHOTO_CACHE = "public, max-age=300"
+# The photo is revalidated too (its random stored name is the ETag), so it disappears with the page.
+PHOTO_CACHE = "public, no-cache"
 
 
 def revalidated(request: Request, response: Response) -> Response:
@@ -199,7 +198,10 @@ def public_router(ctx: CloudContext, members: MemberAuth, owner_signed_in: Any) 
         if not path.exists():
             return not_found(request)
         cache = PHOTO_CACHE if public else "private, no-store"
-        return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": cache})
+        tag = '"' + stored.stored_name.split(".", 1)[0] + '"'
+        if public and tag in request.headers.get("if-none-match", ""):
+            return Response(status_code=304, headers={"Cache-Control": cache, "ETag": tag})
+        return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": cache, "ETag": tag})
 
     async def _may_preview(request: Request, user_id: int, handle: str) -> bool:
         signed = await members.current(request)
