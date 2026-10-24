@@ -7,6 +7,7 @@ import secrets
 import sqlite3
 import time
 import zipfile
+from dataclasses import replace
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -49,6 +50,29 @@ PROFILE = {
 
 def app_for(settings: Settings, transport=None):
     return create_app(settings, transport=transport)
+
+
+class Outbox:
+    """Stands in for Mailer.send and keeps what would have been emailed."""
+
+    def __init__(self):
+        self.sent: list[tuple[str, str, str]] = []
+
+    async def send(self, to, subject, body):
+        self.sent.append((to, subject, body))
+        return True
+
+
+def mail_app_for(settings: Settings, monkeypatch, transport=None):
+    """An app with SMTP configured and its mailer replaced by an Outbox: (app, settings, outbox)."""
+    from openfolio_worker.config import SmtpSettings
+
+    smtp = SmtpSettings(host="smtp.example.com", port=587, sender="o@example.com", user=None, password=None)
+    settings = replace(settings, cloud=replace(settings.cloud, smtp=smtp))
+    app = app_for(settings, transport=transport)
+    outbox = Outbox()
+    monkeypatch.setattr(app.state.cloud.mailer, "send", outbox.send)
+    return app, settings, outbox
 
 
 def browser(app) -> TestClient:

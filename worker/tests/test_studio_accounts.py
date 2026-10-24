@@ -2,7 +2,6 @@
 
 import re
 import time
-from dataclasses import replace
 
 import pytest
 
@@ -19,6 +18,7 @@ from studio_helpers import (
     form_token,
     invite,
     join,
+    mail_app_for,
     owner,
 )
 
@@ -246,25 +246,9 @@ def test_paused_members_cannot_sign_in(app, cloud_settings):
     assert "paused" in r.text
 
 
-class Outbox:
-    def __init__(self):
-        self.sent: list[tuple[str, str, str]] = []
-
-    async def send(self, to, subject, body):
-        self.sent.append((to, subject, body))
-        return True
-
-
 @pytest.fixture
 def mail_app(cloud_settings, monkeypatch):
-    from openfolio_worker.config import SmtpSettings
-
-    smtp = SmtpSettings(host="smtp.example.com", port=587, sender="o@example.com", user=None, password=None)
-    settings = replace(cloud_settings, cloud=replace(cloud_settings.cloud, smtp=smtp))
-    app = app_for(settings)
-    outbox = Outbox()
-    monkeypatch.setattr(app.state.cloud.mailer, "send", outbox.send)
-    return app, settings, outbox
+    return mail_app_for(cloud_settings, monkeypatch)
 
 
 def test_password_reset_by_email_is_single_use_and_never_enumerates(mail_app):

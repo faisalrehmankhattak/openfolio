@@ -127,18 +127,21 @@ class MemberAdmin:
             except ValidationError:
                 return auth.refuse(request, 409, "That submission doesn't validate any more.")
             context = profile_context(ctx, persona, review.data, show_in_search=False)
-            return ctx.render(
-                request,
-                "profile_page.html",
-                csp=ctx.widget_csp,
-                headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"},
-                **context,
+            # The public page's template, but the widget runs the submitted copy and the review controls show.
+            context.update(
                 widget_id=f"{review.handle}~preview",
                 preview_note=(
                     f"Submission from @{review.handle}, not public yet. The AI below answers from this version."
                 ),
                 review=review,
+            )
+            return ctx.render(
+                request,
+                "profile_page.html",
+                csp=ctx.widget_csp,
+                headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex"},
                 csrf=ctx.keys.csrf_token(session),
+                **context,
             )
 
         @router.post("/admin/reviews/{review_id}/{action}")
