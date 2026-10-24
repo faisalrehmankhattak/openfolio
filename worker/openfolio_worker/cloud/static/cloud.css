@@ -276,7 +276,7 @@ p { margin: 0; }
 .guide-body .answer-label { margin: 0 0 8px; color: var(--accent-text); font-size: 13px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
 .guide-body h2 { margin: 48px 0 14px; font-size: clamp(24px, 3vw, 29px); font-weight: 760; letter-spacing: -.03em; }
 .guide-body p, .guide-body li { color: var(--ink-2); font-size: 17px; line-height: 1.7; }
-.guide-body p + p { margin-top: 12px; }
+.guide-body p + p, .guide-body ul + p, .guide-body ol + p { margin-top: 14px; }
 .guide-body ul, .guide-body ol { margin: 10px 0 0; padding-left: 24px; }
 .guide-body li + li { margin-top: 8px; }
 .guide-body ol.numbered { padding-left: 0; list-style: none; counter-reset: step; }
