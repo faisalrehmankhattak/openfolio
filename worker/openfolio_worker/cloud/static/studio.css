@@ -250,7 +250,8 @@ span.photo-preview { width: 168px; height: 168px; }
 .tab-sep { width: 1px; align-self: stretch; margin: 6px 4px; background: var(--line-strong); }
 .count-hot { background: #d9480f !important; color: #fff !important; }
 .member-table td { vertical-align: middle; }
-.member-table td a { white-space: nowrap; }
+.member-table td a { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+/* The flex row lives inside the cell: a flex <td> stops being a table cell and breaks the row's border. */
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .review-list { list-style: none; margin: 0 0 24px; padding: 0; display: grid; gap: 14px; }
 .review-card { display: grid; gap: 12px; padding: 20px 22px; }
@@ -297,6 +298,18 @@ span.photo-preview { width: 168px; height: 168px; }
   .page-head-row { align-items: flex-start; }
   .who-handle { display: none; }
   .who { padding: 3px; }
+  /* Members as cards on phones, so status and the Pause / Reset / Delete buttons stay in view. */
+  .member-table { overflow: visible; }
+  .member-table table, .member-table tbody { display: block; }
+  .member-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .member-table tr { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; padding: 16px; }
+  .member-table tr + tr { border-top: 1px solid var(--line); }
+  .member-table td { display: block; padding: 0; border: 0; }
+  .member-table td:first-child, .member-table td:last-child { grid-column: 1 / -1; }
+  .member-table .when-joined, .member-table .when-active { font-size: 13px; color: var(--muted); }
+  .member-table .when-joined::before { content: "Joined "; }
+  .member-table .when-active::before { content: "Active "; }
+  .member-table .row-actions { justify-content: flex-start; padding-top: 4px; }
 }
 @media (prefers-color-scheme: dark) {
   .snav-status.status-pending, .pill-pending, .review-note-label { color: #f0b84a; }

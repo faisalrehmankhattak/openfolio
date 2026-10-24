@@ -48,9 +48,10 @@
           <td><p class="strong mono">@{{ m.handle }}</p><p class="muted small">{{ m.name }} · {{ m.email }}</p></td>
           <td><span class="badge {{ 'badge-ok' if m.status == 'active' else 'badge-warn' }}">{{ m.status|capitalize }}</span></td>
           <td>{% if m.persona_status == "live" and m.status == "active" %}<a href="/p/{{ m.handle }}" target="_blank" rel="noopener">Live {{ icon("external", 14) }}</a>{% else %}<span class="muted">{{ {"draft": "Draft", "pending": "In review", "rejected": "Sent back", "paused": "Paused by member", "live": "Live (account paused)"}.get(m.persona_status, "None") }}</span>{% endif %}</td>
-          <td><time datetime="{{ m.created_at|iso }}" title="{{ m.created_at|when }}" data-local>{{ m.created_at|ago(now) }}</time></td>
-          <td>{% if m.last_active_at %}<time datetime="{{ m.last_active_at|iso }}" title="{{ m.last_active_at|when }}" data-local>{{ m.last_active_at|ago(now) }}</time>{% else %}<span class="muted">Never</span>{% endif %}</td>
-          <td class="row-actions">
+          <td class="when-joined"><time datetime="{{ m.created_at|iso }}" title="{{ m.created_at|when }}" data-local>{{ m.created_at|ago(now) }}</time></td>
+          <td class="when-active">{% if m.last_active_at %}<time datetime="{{ m.last_active_at|iso }}" title="{{ m.last_active_at|when }}" data-local>{{ m.last_active_at|ago(now) }}</time>{% else %}<span class="muted">Never</span>{% endif %}</td>
+          <td>
+            <div class="row-actions">
             <form class="inline-form" method="post" action="/admin/members/{{ m.id }}/{{ 'pause' if m.status == 'active' else 'unpause' }}"{% if m.status == "active" %} data-confirm="Pause @{{ m.handle }}? Their page goes offline and they are signed out."{% endif %}>
               <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-soft btn-small" type="submit">{{ "Pause" if m.status == "active" else "Unpause" }}</button>
             </form>
@@ -60,6 +61,7 @@
             <form class="inline-form" method="post" action="/admin/members/{{ m.id }}/delete" data-confirm="Delete @{{ m.handle }} and all their data? This can't be undone.">
               <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-danger btn-small" type="submit">Delete</button>
             </form>
+            </div>
           </td>
         </tr>
         {% endfor %}
