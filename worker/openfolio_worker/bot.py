@@ -180,12 +180,19 @@ async def run_conversation(
         )
         await worker.queue_frames([LLMRunFrame()])
 
+    checking_idle = False
+
     @worker.event_handler("on_idle_timeout")
     async def on_idle_timeout(_worker: Any) -> None:
-        # Pipecat checks once per window; finishing at the exact deadline keeps silence from lasting two windows.
-        if wait := activity.seconds_until_idle(persona.idle_seconds):
-            await asyncio.sleep(wait)
-        if not activity.is_idle(persona.idle_seconds):
+        nonlocal checking_idle
+        if checking_idle:  # a check from the previous window is still waiting
+            return
+        checking_idle = True
+        try:
+            idle = await activity.settle_idle(persona.idle_seconds)
+        finally:
+            checking_idle = False
+        if not idle:
             return
         logger.info(f"[{session_id}] no activity for {persona.idle_seconds}s; hanging up")
         await worker.queue_frames([ended("idle")])

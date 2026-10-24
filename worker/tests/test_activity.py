@@ -1,3 +1,5 @@
+import asyncio
+
 from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
@@ -5,6 +7,7 @@ from pipecat.frames.frames import (
     LLMFullResponseEndFrame,
     LLMFullResponseStartFrame,
     LLMMessagesAppendFrame,
+    UserStartedSpeakingFrame,
 )
 
 from openfolio_worker.activity import ConversationActivity
@@ -56,3 +59,35 @@ def test_seconds_until_idle_counts_down_from_last_activity():
     assert activity.seconds_until_idle(15) == 0
     activity.record(LLMFullResponseStartFrame())
     assert activity.seconds_until_idle(15) is None
+
+
+def _settle(activity: ConversationActivity, now: list[float], seconds: float, busy_until: float | None = None) -> bool:
+    async def fake_sleep(delay: float) -> None:
+        now[0] += delay
+        if busy_until is not None and now[0] >= busy_until and activity.bot_speaking:
+            activity.record(BotStoppedSpeakingFrame())
+
+    return asyncio.run(activity.settle_idle(seconds, sleep=fake_sleep))
+
+
+def test_settle_idle_waits_for_the_exact_deadline():
+    now = [0.0]
+    activity = ConversationActivity(clock=lambda: now[0])
+    now[0] = 10
+    assert _settle(activity, now, 15)
+    assert now[0] == 15
+
+
+def test_settle_idle_counts_from_when_the_bot_stops_speaking():
+    now = [0.0]
+    activity = ConversationActivity(clock=lambda: now[0])
+    activity.record(BotStartedSpeakingFrame())
+    assert _settle(activity, now, 15, busy_until=3)
+    assert now[0] == 18  # not a whole extra window
+
+
+def test_settle_idle_gives_up_while_the_conversation_continues():
+    now = [0.0]
+    activity = ConversationActivity(clock=lambda: now[0])
+    activity.record(UserStartedSpeakingFrame())
+    assert not _settle(activity, now, 15)

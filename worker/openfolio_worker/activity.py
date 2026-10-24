@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from pipecat.frames.frames import (
     BotSpeakingFrame,
@@ -71,6 +72,23 @@ class ConversationActivity(BaseObserver):
 
     def is_idle(self, seconds: float) -> bool:
         return self.seconds_until_idle(seconds) == 0
+
+    async def settle_idle(
+        self, seconds: float, step: float = 1.0, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+    ) -> bool:
+        """Wait for the exact idle deadline after Pipecat reports a quiet window.
+
+        Pipecat only checks once per window, so a call that was still busy at that moment would
+        otherwise stay open for a second full window. Gives up if someone is still busy after one
+        more window; the next window's check takes over from there.
+        """
+        start = self._clock()
+        while (wait := self.seconds_until_idle(seconds)) != 0:
+            elapsed = self._clock() - start
+            if (wait is None and elapsed >= seconds) or elapsed >= 2 * seconds:
+                return False
+            await sleep(step if wait is None else min(wait, step))
+        return True
 
     async def on_push_frame(self, data: FramePushed) -> None:
         self.record(data.frame)
