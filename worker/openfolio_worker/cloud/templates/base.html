@@ -1,0 +1,56 @@
+{% from "_icons.html" import mark %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Openfolio Cloud{% endblock %}</title>
+  <meta name="description" content="{% block description %}A 3D AI version of you that talks to recruiters by voice or chat, answering only from what you wrote. Invite-only beta.{% endblock %}">
+  {% if noindex is defined and noindex %}<meta name="robots" content="noindex, nofollow">{% endif %}
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1318" media="(prefers-color-scheme: dark)">
+  <meta property="og:title" content="Openfolio Cloud: your portfolio, alive">
+  <meta property="og:description" content="A 3D AI version of you that talks to recruiters by voice or chat. Invite-only beta.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/cloud/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/cloud/static/cloud.css?v={{ asset_version }}">
+  <script src="/cloud/static/cloud.js?v={{ asset_version }}" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip" href="#main">Skip to content</a>
+  {% block header %}
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="/" aria-label="Openfolio Cloud, home">{{ mark(28) }}<span class="brand-name">Openfolio</span><span class="brand-tag">Cloud</span></a>
+      <nav class="nav" aria-label="Main">
+        <a class="nav-link" href="/#how">How it works</a>
+        <a class="nav-link" href="/#safety">Safety</a>
+        <a class="btn btn-primary btn-small" href="/#request">Request access</a>
+      </nav>
+    </div>
+  </header>
+  {% endblock %}
+  <main id="main" tabindex="-1">
+    {% block main %}{% endblock %}
+  </main>
+  {% block footer %}
+  <footer class="site-footer">
+    <div class="wrap footer-row">
+      <div class="footer-brand">
+        <a class="brand brand-quiet" href="/">{{ mark(24) }}<span class="brand-name">Openfolio</span><span class="brand-tag">Cloud</span></a>
+        <p class="footer-note">Invite-only beta. Openfolio is open source under Apache-2.0; you can also run it yourself.</p>
+      </div>
+      <nav class="footer-nav" aria-label="Footer">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="{{ github_url }}" rel="noopener">GitHub</a>
+        {% if contact_email %}<a href="mailto:{{ contact_email }}">Contact</a>{% endif %}
+      </nav>
+    </div>
+  </footer>
+  {% endblock %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

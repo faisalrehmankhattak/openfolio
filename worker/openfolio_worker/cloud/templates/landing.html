@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Openfolio Cloud: your portfolio, alive{% endblock %}
+{% block body_class %}landing{% endblock %}
+{% block head %}
+{% if turnstile_site_key %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}
+{% endblock %}
+
+{% macro field_error(name) %}
+{% if errors.get(name) %}<p class="field-error" id="{{ name }}-error">{{ icon("alert", 16) }}<span>{{ errors[name] }}</span></p>{% endif %}
+{% endmacro %}
+{% macro invalid(name) %}{% if errors.get(name) %} aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}{% endmacro %}
+
+{% block main %}
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Invite-only beta</p>
+      <h1 class="hero-title">Your portfolio, <span class="accent-text">alive.</span></h1>
+      <p class="lead">A 3D AI version of you that talks to recruiters by voice or chat, any time, and answers only from what you wrote.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary btn-large" href="#request">Request access {{ icon("arrow", 18) }}</a>
+        {% if demo %}<button class="btn btn-ghost btn-large" type="button" data-demo="voice">{{ icon("mic", 18) }} Talk to the demo</button>{% endif %}
+      </div>
+      <ul class="hero-points" aria-label="Highlights">
+        <li>{{ icon("check", 16) }} Always labelled AI</li>
+        <li>{{ icon("check", 16) }} Your words only</li>
+        <li>{{ icon("check", 16) }} One line of HTML</li>
+      </ul>
+    </div>
+
+    {% if demo %}
+    <div class="hero-demo">
+      <div class="glow" aria-hidden="true"></div>
+      <figure class="preview">
+        <div class="preview-head">
+          <div class="preview-avatar" aria-hidden="true">
+            {% if demo.avatar.image %}<img src="{{ demo.avatar.image|asset }}" alt="" width="56" height="56">{% endif %}
+            <span class="ai-tag">AI</span>
+          </div>
+          <div class="preview-id">
+            <p class="preview-name">{{ demo.name }}</p>
+            <p class="preview-title">AI version · {{ demo.title }}</p>
+          </div>
+          <span class="live"><span class="live-dot" aria-hidden="true"></span>Live</span>
+        </div>
+        <div class="preview-body" aria-hidden="true">
+          <p class="bubble bubble-bot">Hi, I'm the AI version of {{ demo.first_name }}. Ask me about my work, by voice or chat.</p>
+          {% if demo.quick_questions %}<p class="bubble bubble-user">{{ demo.quick_questions[0].question }}</p>{% endif %}
+          <p class="bubble bubble-bot typing"><span></span><span></span><span></span></p>
+        </div>
+        {% if demo.quick_questions %}
+        <div class="chips" aria-hidden="true">
+          {% for q in demo.quick_questions[:4] %}<span class="chip">{{ q.label }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        <figcaption class="preview-actions">
+          <span class="preview-hint">This demo is live. Try it:</span>
+          <span class="preview-buttons">
+            <button class="btn btn-primary btn-small" type="button" data-demo="voice">{{ icon("mic", 16) }} Talk</button>
+            <button class="btn btn-soft btn-small" type="button" data-demo="chat">{{ icon("chat", 16) }} Chat</button>
+          </span>
+        </figcaption>
+      </figure>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section" id="how" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="kicker">How it works</p>
+      <h2 id="how-title" class="section-title">From request to a portfolio that talks back</h2>
+    </div>
+    <ol class="steps">
+      <li class="step">
+        <span class="step-num" aria-hidden="true">1</span>
+        <h3>Request access</h3>
+        <p>Tell us who you are and where your portfolio lives. It takes a minute.</p>
+      </li>
+      <li class="step">
+        <span class="step-num" aria-hidden="true">2</span>
+        <h3>Get approved</h3>
+        <p>We read every request by hand and email you a private invite link.</p>
+      </li>
+      <li class="step">
+        <span class="step-num" aria-hidden="true">3</span>
+        <h3>Add your story and avatar</h3>
+        <p>Write what your AI may say: projects, experience and your own rules. Add a photo and pick a 3D avatar.</p>
+      </li>
+      <li class="step">
+        <span class="step-num" aria-hidden="true">4</span>
+        <h3>Paste one line</h3>
+        <p>One script tag on your site, and visitors can talk to you.</p>
+        <code class="snippet">&lt;script src="…/embed.js" data-persona="you" async&gt;&lt;/script&gt;</code>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="section section-tint" id="safety" aria-labelledby="safety-title">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="kicker">Safety</p>
+      <h2 id="safety-title" class="section-title">Four promises we build around</h2>
+      <p class="section-lead">An AI that speaks for you has to be honest about what it is and careful with what it says.</p>
+    </div>
+    <ul class="promises">
+      <li class="promise">
+        <span class="promise-icon">{{ icon("tag", 22) }}</span>
+        <h3>Always labelled AI</h3>
+        <p>The button, the panel and the first answer all say it's an AI version of you. It never claims to be human.</p>
+      </li>
+      <li class="promise">
+        <span class="promise-icon">{{ icon("book", 22) }}</span>
+        <h3>Answers only from what you wrote</h3>
+        <p>Facts come from your story alone. When something isn't covered, it says it doesn't know and points to the real you.</p>
+      </li>
+      <li class="promise">
+        <span class="promise-icon">{{ icon("globe", 22) }}</span>
+        <h3>Only on your own site</h3>
+        <p>It runs on the websites you list. Other sites can't put your AI on their pages.</p>
+      </li>
+      <li class="promise">
+        <span class="promise-icon">{{ icon("pause", 22) }}</span>
+        <h3>You can pause any time</h3>
+        <p>Switch it off and it stops answering. Your story stays yours, and you can delete it.</p>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section class="section" id="request" aria-labelledby="request-title">
+  <div class="wrap request-grid">
+    <div class="request-copy">
+      <p class="kicker">Join the beta</p>
+      <h2 id="request-title" class="section-title">Request access</h2>
+      <p class="section-lead">We're letting people in a few at a time, so everyone gets a good start. Tell us a little about you.</p>
+      <ol class="next-steps">
+        <li><span class="next-num" aria-hidden="true">1</span><span>We read your request ourselves.</span></li>
+        <li><span class="next-num" aria-hidden="true">2</span><span>If it's a fit, you get a personal invite link by email.</span></li>
+        <li><span class="next-num" aria-hidden="true">3</span><span>When the Studio opens, you build your AI version.</span></li>
+      </ol>
+      <p class="fine">{{ icon("lock", 16) }} We keep only what you send here and a hashed network address. <a href="/privacy">Privacy notice</a></p>
+    </div>
+
+    <form class="card form" method="post" action="/cloud/requests#request" novalidate>
+      {% if form_error or errors %}
+      <div class="alert alert-error" role="alert">
+        {{ icon("alert", 18) }}
+        <p>{{ form_error if form_error else "Please check the highlighted fields." }}</p>
+      </div>
+      {% endif %}
+
+      <div class="field">
+        <label for="name">Your name</label>
+        <input class="input" id="name" name="name" type="text" autocomplete="name" maxlength="100" required value="{{ values.get('name', '') }}"{{ invalid("name") }}>
+        {{ field_error("name") }}
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input class="input" id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" required value="{{ values.get('email', '') }}"{{ invalid("email") }}>
+        {{ field_error("email") }}
+      </div>
+      <div class="field">
+        <label for="portfolio_url">Portfolio website</label>
+        <input class="input" id="portfolio_url" name="portfolio_url" type="text" inputmode="url" autocomplete="url" maxlength="300" placeholder="https://yourname.dev" required value="{{ values.get('portfolio_url', '') }}"{{ invalid("portfolio_url") }}>
+        {{ field_error("portfolio_url") }}
+      </div>
+      <div class="field">
+        <label for="about">What do you do?</label>
+        <input class="input" id="about" name="about" type="text" maxlength="120" placeholder="Product designer at a fintech startup" required value="{{ values.get('about', '') }}"{{ invalid("about") }}>
+        {{ field_error("about") }}
+      </div>
+      <div class="field">
+        <label for="reason">Why do you want it? <span class="optional">Optional</span></label>
+        <textarea class="input textarea" id="reason" name="reason" rows="4" maxlength="500" aria-describedby="reason-count{% if errors.get('reason') %} reason-error{% endif %}"{% if errors.get('reason') %} aria-invalid="true"{% endif %}>{{ values.get('reason', '') }}</textarea>
+        <p class="hint" id="reason-count" data-count-for="reason" data-max="500">Up to 500 characters.</p>
+        {{ field_error("reason") }}
+      </div>
+
+      <div class="hp" aria-hidden="true">
+        <label for="{{ honeypot }}">Leave this field empty</label>
+        <input id="{{ honeypot }}" name="{{ honeypot }}" type="text" tabindex="-1" autocomplete="off">
+      </div>
+
+      <div class="field field-check">
+        <input class="check" id="consent" name="consent" type="checkbox" required{% if values.get('consent') %} checked{% endif %}{{ invalid("consent") }}>
+        <label for="consent">I agree that Openfolio stores these details to review my request, as described in the <a href="/privacy">privacy notice</a>.</label>
+      </div>
+      {{ field_error("consent") }}
+
+      {% if turnstile_site_key %}<div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-theme="auto"></div>{% endif %}
+
+      <button class="btn btn-primary btn-large btn-block" type="submit">Request access</button>
+      <p class="fine center">We'll only email you about your access.</p>
+    </form>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{% if demo %}<script src="/embed/embed.js" data-persona="{{ demo.id }}" data-label="Talk to {{ demo.first_name }}" async></script>{% endif %}
+{% endblock %}

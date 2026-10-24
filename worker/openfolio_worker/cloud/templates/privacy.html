@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Privacy · Openfolio Cloud{% endblock %}
+{% block main %}
+<article class="prose wrap-narrow">
+  <p class="kicker">Openfolio Cloud</p>
+  <h1>Privacy notice</h1>
+  <p class="beta-note"><strong>Beta.</strong> Openfolio Cloud is an invite-only beta run by one person. This page says plainly what happens to your data; it will change as the service grows, and the date below will change with it.</p>
+
+  <h2>Who runs this</h2>
+  <p>Openfolio Cloud is run by Faisal Rehman.{% if contact_email %} Contact: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% endif %}</p>
+
+  <h2>When you request access</h2>
+  <p>We store what you type into the form: your name, email, portfolio address, what you do and, if you add it, why you want access. We also store the time and a <em>hash</em> of your IP address, salted with a server secret. The hash lets us limit spam (three requests per network per hour) without keeping the address itself.</p>
+  <p>We use these details only to review your request and email you about it. We don't sell them, share them for marketing or add you to a newsletter. The owner may get an email notification with your request, sent through our mail provider.</p>
+
+  <h2>When you talk to an Openfolio AI</h2>
+  <p>To answer, your voice or typed messages are sent to the AI providers that run the service: speech-to-text, a language model and a voice, as listed in the <a href="{{ github_url }}#configuration" rel="noopener">README</a>. Their own privacy terms apply to that processing. Audio may be relayed through Cloudflare's TURN service, which carries the encrypted stream without being able to listen to it.</p>
+  <p>We don't save recordings or transcripts. Server logs, which our host keeps for a limited time, can contain short parts of a conversation, for example a message flagged as an attempt to misuse the AI. If you leave a message for someone through their AI, it's stored so they can read it.</p>
+
+  <h2>Cookies and storage</h2>
+  <p>Visitors get no cookies and no trackers. The only cookie is the owner's sign-in for the admin page. The demo widget remembers in your browser's session storage that you closed its greeting.</p>
+
+  <h2>How long we keep it</h2>
+  <ul>
+    <li>Rejected requests are deleted automatically after 90 days.</li>
+    <li>Invite links that were never used are deleted 30 days after they expire. Links are stored only as a hash.</li>
+    <li>Approved requests are kept while you take part in the beta.</li>
+  </ul>
+
+  <h2>Your choices</h2>
+  <p>You can ask for a copy of your details, a correction or deletion at any time{% if contact_email %} by emailing <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% endif %}. Deleting a request also deletes its invite links.</p>
+
+  <p class="updated">Last updated: October 2026</p>
+</article>
+{% endblock %}

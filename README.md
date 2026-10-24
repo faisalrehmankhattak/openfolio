@@ -133,7 +133,7 @@ Browser (your site)                          Openfolio server (CPU only)
 | Spoofed client IPs | With `TRUST_PROXY=1`, only the address added by your proxy is used |
 | Oversized or malformed requests | Bodies capped at 64 KB (even when streamed) and validated |
 | XSS from model or persona text | All text is rendered with `textContent`; links are limited to http(s) and mailto |
-| TURN credential theft | Browsers get one-hour HMAC credentials; the shared secret never leaves the server |
+| TURN credential theft | Browsers get one-hour credentials; the coturn secret and Cloudflare API token never leave the server |
 | Inbox spam | 2 messages per call, validated email, cleaned text |
 
 The injection screen is a regular expression, not a classifier, and the system prompt is the second layer. The labelled corpus in `worker/tests/test_guard_eval.py` measures both missed attacks and false alarms; add any miss you see in your logs.
@@ -154,8 +154,11 @@ All settings live in `.env` (see [`.env.example`](.env.example)).
 | `CALLS_PER_IP` | `6` | New calls per IP per 10 minutes (local testing is exempt) |
 | `TRUST_PROXY` | `0` | Set to `1` behind a reverse proxy |
 | `DEV_ORIGINS` | localhost | Extra exact origins allowed for every persona |
-| `TURN_URLS`, `TURN_SHARED_SECRET` | | TURN REST relay for strict networks |
+| `TURN_PROVIDER` | `coturn` | `coturn` (the two variables below) or `cloudflare` |
+| `TURN_URLS`, `TURN_SHARED_SECRET` | | coturn TURN REST relay for strict networks |
+| `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN` | | [Cloudflare Realtime TURN](https://developers.cloudflare.com/realtime/turn/) key, for `TURN_PROVIDER=cloudflare`. One-hour credentials, reused for up to 5 minutes; port 53 URLs are dropped; if Cloudflare fails, calls fall back to STUN |
 | `ICE_SERVERS` | Google STUN | Worker-side STUN/TURN as JSON; static credentials are never sent to browsers |
+| `DATA_DIR` | `data/` | Runtime data: the message inbox, logs and (cloud mode) `cloud.db`. Use `/data` with a volume on Railway |
 
 Invalid values stop the server with a message naming the variable.
 
@@ -175,7 +178,41 @@ docker compose -f compose.yaml -f compose.host.yaml up --build -d
 - Saved messages and logs live in the `openfolio-data` volume. `docker compose down -v` deletes them.
 - On Docker Desktop, reach a host Ollama at `http://host.docker.internal:11434/v1`.
 
-`railway.toml` deploys the same image to Railway; any container platform works if you route its `PORT` and provide TURN.
+`railway.toml` deploys the same image to Railway (see the checklist below); any container platform works if you route its `PORT` and provide TURN.
+
+## Openfolio Cloud (invite-only beta)
+
+The same server can run Openfolio Cloud, the hosted, invite-only version. `CLOUD_MODE=1` turns `/` into a landing page with the live demo and a request form, and adds an owner-only admin page. Without it the server behaves as described above.
+
+1. A visitor fills in the request form: name, email, portfolio, what they do and, optionally, why. A hidden honeypot field, 3 requests per network per hour, one pending request per email and, when configured, [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) keep spam out. Every outcome shows the same thank-you page.
+2. You get an email (optional SMTP) and review the request at `/admin`.
+3. **Approve** creates a personal, single-use invite link that expires after 7 days. Only its SHA-256 hash is stored. It is emailed when SMTP is set and always shown once with a Copy button. **Reject** revokes any open invite; **Delete** erases the request and its invites. Every action goes to an audit log on the same page.
+4. The invite link confirms the approval. Stage 2 (the Studio, where approved people build their AI version) will accept it.
+
+Requests live in SQLite at `DATA_DIR/cloud.db`. IP addresses are stored only as hashes salted with `SESSION_SECRET`. Rejected requests are deleted after 90 days and unused invites 30 days after they expire, at startup and every 24 hours. The admin session is an HMAC-signed, HttpOnly, `SameSite=Strict` cookie (12 hours), every admin form carries a CSRF token, and 5 failed sign-ins from one network lock it out for 15 minutes.
+
+| Variable | Purpose |
+| --- | --- |
+| `CLOUD_MODE` | `1` turns the cloud pages on |
+| `PUBLIC_URL` | The site's origin, such as `https://openfolio.up.railway.app` (https; `http://localhost` for development). Used in links, and allowed to run every persona so the demo works |
+| `SESSION_SECRET` | At least 32 random characters (`openssl rand -base64 48`). Signs sessions and salts IP hashes |
+| `ADMIN_PASSWORD_HASH` | Your admin password as an scrypt hash: `cd worker && uv run openfolio-admin-hash` |
+| `CLOUD_DEMO_PERSONA` | Persona in the landing page demo (default `faisal`) |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Optional bot check on the form; set both |
+| `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `NOTIFY_EMAIL` | Optional email: new requests go to `NOTIFY_EMAIL`, approvals send the invite. STARTTLS; Gmail works with `smtp.gmail.com` and an app password |
+
+Cloud pages send a Content Security Policy with only `'self'`, no inline scripts and `frame-ancestors 'none'`, plus `X-Frame-Options: DENY`; admin and invite pages are `no-store`. The landing page runs the live widget, so its policy also allows inline `<style>` elements (the widget styles its shadow DOM at runtime) and `blob:` fetches (the 3D head loads its textures through blob URLs), and Turnstile's origin when it is on. No `eval` is allowed anywhere.
+
+### Deploy to Railway
+
+Railway runs the Dockerfile as one container behind HTTPS. It has no inbound UDP, so call audio must go through a TURN relay; Openfolio uses Cloudflare Realtime TURN for both the browser and the server side of each call.
+
+1. Create a service from this repository. `railway.toml` builds the Dockerfile, runs one replica and checks `/livez`.
+2. Add a volume mounted at `/data`. Railway mounts volumes as root while the image runs as an unprivileged user, so also set `RAILWAY_RUN_UID=0`.
+3. Generate a domain (Settings, Networking) and use it for `PUBLIC_URL`.
+4. Create the admin hash on your machine: `cd worker && uv run openfolio-admin-hash` (it reads the password from stdin; use 12 characters or more).
+5. Set the variables: `CLOUD_MODE=1`, `PUBLIC_URL`, `SESSION_SECRET`, `ADMIN_PASSWORD_HASH`, `DATA_DIR=/data`, `TRUST_PROXY=1`, `TURN_PROVIDER=cloudflare`, `CLOUDFLARE_TURN_KEY_ID`, `CLOUDFLARE_TURN_API_TOKEN`, your LLM, speech and voice keys, and optionally SMTP and Turnstile.
+6. Deploy, open `/admin`, sign in, and send yourself a test request from the landing page.
 
 ## Development
 

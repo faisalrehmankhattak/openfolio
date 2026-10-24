@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, mark %}
+{% set noindex = true %}
+{% block body_class %}admin{% endblock %}
+{% block header %}
+<header class="site-header admin-header">
+  <div class="wrap header-row">
+    <a class="brand" href="/admin" aria-label="Openfolio Cloud admin">{{ mark(28) }}<span class="brand-name">Openfolio</span><span class="brand-tag">Admin</span></a>
+    {% block header_actions %}{% endblock %}
+  </div>
+</header>
+{% endblock %}
+{% block footer %}
+<footer class="site-footer site-footer-quiet">
+  <div class="wrap footer-row">
+    <p class="footer-note">Openfolio Cloud admin · only the owner can sign in here.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Public site</a><a href="/privacy">Privacy</a></nav>
+  </div>
+</footer>
+{% endblock %}

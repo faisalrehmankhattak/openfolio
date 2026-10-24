@@ -28,7 +28,8 @@ COPY LICENSE NOTICE ./
 COPY avatars/LICENSE-readyplayerme.txt avatars/demo-portrait.jpg avatars/faisal-photo.jpg ./avatars/
 COPY --from=avatar /avatars/ ./avatars/
 COPY --from=widget /build/embed/dist/ ./embed/dist/
-RUN useradd --create-home --uid 10001 openfolio && mkdir -p /app/data/inbox /home/openfolio/.cache && chown -R openfolio:openfolio /app/data /home/openfolio
+# /data is where Railway (and other hosts) mount a volume; set DATA_DIR=/data to use it.
+RUN useradd --create-home --uid 10001 openfolio && mkdir -p /app/data/inbox /data /home/openfolio/.cache && chown -R openfolio:openfolio /app/data /data /home/openfolio
 ENV PYTHONUNBUFFERED=1 OPENFOLIO_ROOT=/app UV_NO_SYNC=1 UV_OFFLINE=1
 USER openfolio
 WORKDIR /app/worker

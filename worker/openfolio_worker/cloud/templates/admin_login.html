@@ -1,0 +1,22 @@
+{% extends "admin_base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Sign in · Openfolio Cloud admin{% endblock %}
+{% block main %}
+<section class="page-center">
+  <form class="card login" method="post" action="/admin/login">
+    <span class="notice-icon notice-ink">{{ icon("lock", 24) }}</span>
+    <h1>Owner sign-in</h1>
+    <p class="muted">Review and approve access requests.</p>
+    {% if error %}
+    <div class="alert alert-error" role="alert">{{ icon("alert", 18) }}<p>{{ error }}</p></div>
+    {% elif signed_out %}
+    <div class="alert alert-ok" role="status">{{ icon("check", 18) }}<p>You're signed out.</p></div>
+    {% endif %}
+    <div class="field">
+      <label for="password">Password</label>
+      <input class="input" id="password" name="password" type="password" autocomplete="current-password" required autofocus{% if error %} aria-invalid="true"{% endif %}>
+    </div>
+    <button class="btn btn-primary btn-large btn-block" type="submit">Sign in</button>
+  </form>
+</section>
+{% endblock %}

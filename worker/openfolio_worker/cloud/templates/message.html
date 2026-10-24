@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ heading }} · Openfolio Cloud{% endblock %}
+{% block main %}
+<section class="page-center">
+  <div class="card notice">
+    <span class="notice-icon {{ 'notice-error' if kind == 'error' else 'notice-ok' }}">{{ icon("alert" if kind == "error" else "check", 28) }}</span>
+    <h1>{{ heading }}</h1>
+    <p class="lead-sm">{{ text }}</p>
+    <div class="notice-actions">
+      <a class="btn btn-primary" href="{{ link if link is defined else '/' }}">{{ link_text if link_text is defined else "Go to the home page" }}</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

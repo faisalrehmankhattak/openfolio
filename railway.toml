@@ -6,3 +6,7 @@ dockerfilePath = "Dockerfile"
 numReplicas = 1
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
+# Liveness only: /healthz also runs provider checks, which should not fail a deploy.
+# The first start loads the voice model before serving, so allow it time.
+healthcheckPath = "/livez"
+healthcheckTimeout = 600

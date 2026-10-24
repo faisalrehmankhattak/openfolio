@@ -1,0 +1,156 @@
+{% extends "admin_base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ counts[tab] }} {{ tab }} · Openfolio Cloud admin{% endblock %}
+{% block header_actions %}
+<form class="inline-form" method="post" action="/admin/logout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="btn btn-ghost btn-small" type="submit">{{ icon("logout", 16) }} Sign out</button>
+</form>
+{% endblock %}
+
+{% macro action(r, name, label, style, confirm=None) %}
+<form class="inline-form" method="post" action="/admin/requests/{{ r.id }}/{{ name }}"{% if confirm %} data-confirm="{{ confirm }}"{% endif %}>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <button class="btn {{ style }} btn-small" type="submit">{{ label }}</button>
+</form>
+{% endmacro %}
+
+{% block main %}
+<div class="wrap admin-main">
+  <div class="admin-title">
+    <div>
+      <h1>Access requests</h1>
+      <p class="muted">{% if mail_enabled %}{{ icon("mail", 16) }} Email is on: approvals send the invite automatically.{% else %}{{ icon("mail", 16) }} Email is off: copy each invite link and send it yourself.{% endif %}</p>
+    </div>
+  </div>
+
+  {% if flash %}
+    {% if flash.kind == "invite" %}
+    <section class="flash flash-invite" role="status" aria-labelledby="flash-title">
+      <div class="flash-head">
+        <span class="flash-icon">{{ icon("check", 20) }}</span>
+        <div>
+          <h2 id="flash-title">Approved {{ flash.name }}</h2>
+          <p>
+            {% if flash.emailed is sameas true %}The invite was emailed to {{ flash.email }}.
+            {% elif flash.emailed is sameas false %}The email to {{ flash.email }} failed. Send this link yourself.
+            {% else %}Send this link to {{ flash.email }}.
+            {% endif %}
+            It works once, for 7 days, and is shown only this time.
+          </p>
+        </div>
+      </div>
+      <div class="copy-row">
+        <input class="input mono" id="invite-link" type="text" readonly value="{{ flash.link }}" aria-label="Invite link for {{ flash.name }}">
+        <button class="btn btn-primary" type="button" data-copy="#invite-link">{{ icon("link", 16) }} <span>Copy link</span></button>
+      </div>
+    </section>
+    {% else %}
+    <p class="flash flash-note" role="status">{{ icon("check", 18) }} <span>{{ flash.text }}</span></p>
+    {% endif %}
+  {% endif %}
+
+  <nav class="tabs" aria-label="Request status">
+    {% for name in ("pending", "approved", "rejected") %}
+    <a class="tab{% if name == tab %} is-active{% endif %}" href="/admin?tab={{ name }}"{% if name == tab %} aria-current="page"{% endif %}>
+      {{ name|capitalize }} <span class="count">{{ counts[name] }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+
+  {% if rows %}
+  <ul class="requests">
+    {% for r in rows %}
+    <li class="req">
+      <div class="req-head">
+        <span class="req-avatar" aria-hidden="true">{{ (r.name[:1] or "?")|upper }}</span>
+        <div class="req-id">
+          <h2 class="req-name">{{ r.name }}</h2>
+          <p class="req-email">{{ r.email }}</p>
+        </div>
+        <p class="req-time">Arrived <time datetime="{{ r.created_at|iso }}" title="{{ r.created_at|when }}" data-local>{{ r.created_at|ago(now) }}</time></p>
+      </div>
+      <dl class="req-facts">
+        <div>
+          <dt>Portfolio</dt>
+          <dd>{% set url = r.portfolio_url|safe_url %}{% if url %}<a href="{{ url }}" target="_blank" rel="noopener noreferrer nofollow">{{ r.portfolio_url }} {{ icon("external", 14) }}</a>{% else %}{{ r.portfolio_url }}{% endif %}</dd>
+        </div>
+        <div>
+          <dt>What they do</dt>
+          <dd>{{ r.about }}</dd>
+        </div>
+        {% if r.reason %}
+        <div class="wide">
+          <dt>Why they want it</dt>
+          <dd class="reason">{{ r.reason }}</dd>
+        </div>
+        {% endif %}
+        {% if r.status != "pending" %}
+        <div>
+          <dt>{{ r.status|capitalize }}</dt>
+          <dd><time datetime="{{ r.decided_at|iso }}" title="{{ r.decided_at|when }}" data-local>{{ r.decided_at|ago(now) }}</time></dd>
+        </div>
+        {% endif %}
+        {% if r.status == "approved" %}
+        {% set state = r.invite_state(now) %}
+        <div>
+          <dt>Invite</dt>
+          <dd>
+            {% if state == "used" %}<span class="badge badge-ok">Used</span>
+            {% elif state == "unused" %}<span class="badge">Not opened yet · expires {{ r.invite_expires_at|when }}</span>
+            {% elif state == "expired" %}<span class="badge badge-warn">Expired</span>
+            {% else %}<span class="badge badge-warn">None</span>{% endif %}
+          </dd>
+        </div>
+        {% endif %}
+      </dl>
+      <div class="req-actions">
+        {% if r.status == "pending" %}
+          {{ action(r, "approve", "Approve", "btn-primary") }}
+          {{ action(r, "reject", "Reject", "btn-soft") }}
+        {% elif r.status == "approved" %}
+          {{ action(r, "approve", "New invite link", "btn-soft") }}
+          {{ action(r, "reject", "Reject", "btn-soft", "Reject " ~ r.name ~ "? Their invite link stops working.") }}
+        {% else %}
+          {{ action(r, "approve", "Approve", "btn-soft") }}
+        {% endif %}
+        <span class="spacer"></span>
+        {{ action(r, "delete", "Delete", "btn-danger", "Delete everything about " ~ r.name ~ "? This can't be undone.") }}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty">
+    <span class="notice-icon notice-ink">{{ icon("check", 24) }}</span>
+    <p>{% if tab == "pending" %}No pending requests. New ones appear here{% if mail_enabled %} and arrive by email{% endif %}.{% else %}No {{ tab }} requests.{% endif %}</p>
+  </div>
+  {% endif %}
+
+  <section class="audit" aria-labelledby="audit-title">
+    <h2 id="audit-title">Activity</h2>
+    <p class="muted">The latest 50 events. Networks are salted hashes, never addresses.</p>
+    {% if audit %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">When</th><th scope="col">Event</th><th scope="col">Request</th><th scope="col">Network</th><th scope="col">Detail</th></tr></thead>
+        <tbody>
+          {% for e in audit %}
+          <tr>
+            <td><time datetime="{{ e.at|iso }}" title="{{ e.at|when }}" data-local>{{ e.at|ago(now) }}</time></td>
+            <td><span class="event event-{{ e.action|replace('.', '-') }}">{{ audit_labels.get(e.action, e.action) }}</span></td>
+            <td>{% if e.request_id %}#{{ e.request_id }}{% endif %}</td>
+            <td class="mono">{{ (e.ip_hash or "")[:8] }}</td>
+            <td>{{ e.detail }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="muted">Nothing yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

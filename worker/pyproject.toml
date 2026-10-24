@@ -25,6 +25,7 @@ dependencies = [
   "pydantic>=2.7",
   "loguru>=0.7",
   "httpx>=0.27",
+  "jinja2>=3.1",
 ]
 
 [project.urls]
@@ -38,6 +39,7 @@ whisper = ["pipecat-ai[whisper]==1.13.0"]
 openfolio-worker = "openfolio_worker.server:main"
 openfolio-doctor = "openfolio_worker.doctor:main"
 openfolio-schema = "openfolio_worker.persona:main"
+openfolio-admin-hash = "openfolio_worker.cloud.auth:main"
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.8", "mypy>=1.13"]
@@ -59,7 +61,7 @@ ignore = ["RUF001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["openfolio_worker"]
-known-local-folder = ["conftest"]
+known-local-folder = ["conftest", "cloud_helpers"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106"]

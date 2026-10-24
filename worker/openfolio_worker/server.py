@@ -6,6 +6,7 @@ POST  /v1/personas/{id}/offer         WebRTC offer -> answer; starts a conversat
 PATCH /v1/personas/{id}/offer         trickled ICE candidates
 GET   /livez, /healthz                liveness and readiness
 GET   /embed/*, /avatars/*, /         widget, avatar files, demo page
+With CLOUD_MODE=1, / is the Openfolio Cloud landing page and cloud/routes.py adds its pages.
 """
 
 from __future__ import annotations
@@ -19,8 +20,9 @@ from collections import defaultdict, deque
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -39,8 +41,11 @@ from pydantic import BaseModel, Field, ValidationError
 from .bot import run_conversation
 from .config import ROOT, Settings, load_settings
 from .doctor import run_checks
-from .ice import browser_ice_servers
+from .ice import IceProvider
 from .persona import Persona, load_personas
+
+if TYPE_CHECKING:
+    from .cloud.routes import CloudService
 
 MAX_BODY_BYTES = 64_000
 RATE_WINDOW_SECONDS = 600
@@ -116,15 +121,21 @@ async def read_json(request: Request, model: type[BaseModel]) -> Any:
         raise HTTPException(400, "Malformed signalling request") from e
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
+    """Build the server. transport replaces the network for outbound HTTP (Cloudflare) in tests."""
     settings = settings or load_settings()
     personas = load_personas(settings.personas_dir)
     handler = SmallWebRTCRequestHandler(ice_servers=[IceServer(**s) for s in settings.ice_servers] or None)
+    ice = IceProvider(settings, transport)
     active: dict[str, asyncio.Task[None]] = {}
     checks: dict[str, dict[str, Any]] = {}
     call_limit = RateLimiter(settings.calls_per_ip, RATE_WINDOW_SECONDS)
     ice_limit = RateLimiter(max(settings.calls_per_ip * 4, 1), RATE_WINDOW_SECONDS)
     dev_origins = set(settings.dev_origins)
+    if settings.cloud:
+        # The landing page runs the live demo of every persona from the cloud's own origin.
+        dev_origins.add(settings.cloud.public_url)
+    cloud_service: CloudService | None = None
 
     def ip(request: Request) -> str:
         return client_ip(request, settings.trust_proxy)
@@ -163,7 +174,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             checks.update(await run_checks(settings))
         if not all(c["ok"] for c in checks.values()):
             logger.error("Provider checks failed; calls are refused until they pass. See GET /healthz.")
+        if cloud_service:
+            await cloud_service.start()
         yield
+        if cloud_service:
+            await cloud_service.stop()
         for task in active.values():
             task.cancel()
         await handler.close()  # type: ignore[no-untyped-call]
@@ -185,7 +200,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.middleware("http")
     async def security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         response = await call_next(request)
-        response.headers.update(SECURITY_HEADERS)
+        for name, value in SECURITY_HEADERS.items():
+            response.headers.setdefault(name, value)  # a route may choose a stricter value
         return response
 
     @app.get("/livez")
@@ -211,7 +227,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         check_capacity()
         if not is_local_test(request) and not ice_limit.allow(ip(request)):
             raise HTTPException(429, "Too many requests. Try again in a few minutes.")
-        return JSONResponse({"iceServers": browser_ice_servers(settings)}, headers={"Cache-Control": "no-store"})
+        return JSONResponse({"iceServers": await ice.browser()}, headers={"Cache-Control": "no-store"})
 
     @app.post("/v1/personas/{persona_id}/offer")
     async def offer(persona_id: str, request: Request) -> Any:
@@ -239,11 +255,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
             active[session_id] = asyncio.create_task(run())
 
-        # Fresh TURN REST credentials for the worker side of every connection.
-        relay = [s for s in browser_ice_servers(settings) if "credential" in s]
-        if settings.turn_server_urls:
-            relay = [{**s, "urls": settings.turn_server_urls} for s in relay]
-        handler.update_ice_servers([IceServer(**s) for s in settings.ice_servers + relay] or None)
+        # Fresh TURN credentials for the worker side of every connection; without inbound UDP
+        # (Railway) the server's media can only arrive through the relay.
+        handler.update_ice_servers([IceServer(**s) for s in await ice.worker()] or None)
         request_ = SmallWebRTCRequest(sdp=body.sdp, type=body.type, pc_id=body.pc_id, restart_pc=body.restart_pc)
         return await handler.handle_web_request(request=request_, webrtc_connection_callback=on_connection)
 
@@ -264,6 +278,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings.avatars_dir.exists():
         app.mount("/avatars", StaticFiles(directory=settings.avatars_dir), name="avatars")
 
+    if settings.cloud:
+        from .cloud.routes import install  # self-hosted servers never load the cloud pages
+
+        cloud_service = install(app, settings, personas, ip, transport)
+        return app
+
     demo = ROOT / "demo" / "index.html"
 
     @app.get("/", include_in_schema=False, response_model=None)
@@ -281,10 +301,11 @@ def main() -> None:
 
     import uvicorn
 
-    log_dir = Path(os.getenv("LOG_DIR", ROOT / "data"))
+    settings = load_settings()  # reads .env, so DATA_DIR from there applies to the log too
+    log_dir = Path(os.getenv("LOG_DIR") or settings.data_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
     logger.add(log_dir / "worker.log", level="INFO", rotation="5 MB", retention=3, enqueue=True)
-    uvicorn.run(create_app(), host=args.host, port=args.port, proxy_headers=False)
+    uvicorn.run(create_app(settings), host=args.host, port=args.port, proxy_headers=False)
 
 
 if __name__ == "__main__":
