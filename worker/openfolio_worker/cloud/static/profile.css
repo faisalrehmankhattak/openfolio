@@ -31,7 +31,17 @@ p { margin: 0; }
 
 .pf-preview-bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; padding: 10px 16px; background: #fdf3d8; color: #6b4b00; font-size: 14px; font-weight: 600; }
 .pf-preview-bar a { color: inherit; }
-@media (prefers-color-scheme: dark) { .pf-preview-bar { background: #3a2f12; color: #f3d48a; } }
+.pf-preview-text { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+.pf-review-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+.pf-reject { display: flex; gap: 8px; flex: 1 1 320px; max-width: 460px; }
+.pf-input { flex: 1; min-width: 0; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(107, 75, 0, .3); background: #fffaf0; color: #3d2b00; font: 500 14px/1 var(--font); }
+.pf-input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.pf-btn-sm { min-height: 34px; padding: 0 14px; font-size: 13.5px; }
+.pf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (prefers-color-scheme: dark) {
+  .pf-preview-bar { background: #3a2f12; color: #f3d48a; }
+  .pf-input { background: #2a220d; color: #f8e7bd; border-color: rgba(243, 212, 138, .3); }
+}
 
 .pf-top { position: sticky; top: 0; z-index: 30; background: color-mix(in srgb, var(--bg) 80%, transparent); -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px); border-bottom: 1px solid var(--line); }
 .pf-top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 60px; }

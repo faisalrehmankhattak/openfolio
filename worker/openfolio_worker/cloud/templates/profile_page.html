@@ -37,7 +37,23 @@
 <body class="pf">
   <a class="pf-skip" href="#main">Skip to content</a>
   {% if preview_note %}
-  <div class="pf-preview-bar" role="note">{{ icon("eye", 16) }} <span>{{ preview_note }}</span> <a href="/admin?tab=reviews">Back to reviews</a></div>
+  <div class="pf-preview-bar" role="note">
+    <p class="pf-preview-text">{{ icon("eye", 16) }} <span>{{ preview_note }}</span> <a href="/admin?tab=reviews">Back to reviews</a></p>
+    {% if review %}
+    <div class="pf-review-actions">
+      <form method="post" action="/admin/reviews/{{ review.id }}/approve" data-confirm="Approve @{{ review.handle }}'s page? It goes live immediately.">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="pf-btn pf-btn-primary pf-btn-sm" type="submit">{{ icon("check", 15) }}<span>Approve</span></button>
+      </form>
+      <form class="pf-reject" method="post" action="/admin/reviews/{{ review.id }}/reject">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="pf-sr" for="review-note">Note for @{{ review.handle }}</label>
+        <input class="pf-input" id="review-note" name="note" type="text" maxlength="1000" placeholder="What should they change? (sent to them)">
+        <button class="pf-btn pf-btn-ghost pf-btn-sm" type="submit">Send back</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
   {% endif %}
   <header class="pf-top">
     <div class="pf-wrap pf-top-row">
