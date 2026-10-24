@@ -23,7 +23,8 @@ Openfolio is an open-source **AI avatar widget for portfolio websites**: a talki
 
 ## Features
 
-- **One script tag.** `embed.js` is 3 KB (1.5 KB gzipped). The 3D head, voice and chat load only when someone opens it. Shadow DOM keeps your site's CSS untouched.
+- **One script tag.** `embed.js` is 11 KB (4 KB gzipped). The 3D head, voice and chat load only when someone opens it. Shadow DOM keeps your site's CSS untouched.
+- **A launcher people notice.** Your photo blends into your AI avatar on a round button, with a short greeting that offers Talk or Chat.
 - **Real-time voice.** WebRTC with interruptions, live captions and lip-sync driven by the audio itself, so it works with any voice.
 - **Text first.** Typing or tapping a suggested question never asks for the microphone. Voice is one tap away.
 - **Grounded answers.** Everything the AI knows comes from one JSON file you write. It says "I don't know" instead of inventing facts.
@@ -43,7 +44,7 @@ cp .env.example .env    # add LLM_API_KEY, LLM_MODEL and DEEPGRAM_API_KEY
 docker compose up --build
 ```
 
-Open http://localhost:7860 and click **Talk to Faisal**. The first start downloads the Kokoro voice (a few minutes). `docker compose logs -f` shows a check of each provider; `GET /healthz` returns 503 until all pass.
+Open http://localhost:7860 and click the avatar in the corner. The first start downloads the Kokoro voice (a few minutes). `docker compose logs -f` shows a check of each provider; `GET /healthz` returns 503 until all pass.
 
 <details>
 <summary>Without Docker (macOS / Linux)</summary>
@@ -65,10 +66,13 @@ Check your provider settings without starting the server: `cd worker && uv run o
 3. Add rules in `guardrails` (for example "Never discuss salary").
 4. List the sites allowed to embed you in `allowed_origins`.
 5. Optionally point `avatar.url` at your own GLB ([Ready Player Me](https://readyplayer.me) or any rig with ARKit or Oculus visemes).
+6. Set `avatar.photo` to a square photo of you and `avatar.image` to a portrait of your avatar; the launcher blends the two. Either one alone also works.
 
 Add `"$schema": "../persona.schema.json"` to the file for autocompletion and validation in your editor. Unknown keys and invalid values stop the server with a message naming the file.
 
 ## Embed options
+
+<img src=".github/assets/launcher.png" alt="Launcher: a photo blending into the AI avatar, with a greeting offering Talk or Chat" width="328">
 
 ```html
 <!-- Floating button -->
@@ -83,7 +87,8 @@ Add `"$schema": "../persona.schema.json"` to the file for autocompletion and val
 | --- | --- | --- |
 | `persona` / `data-persona` | required | Persona file name |
 | `mode` | `bubble` | `bubble` (floating) or `inline` |
-| `label` / `data-label` | `Talk to me` | Launcher text |
+| `label` / `data-label` | `Talk to me` | Launcher name, shown on hover |
+| `teaser` / `data-teaser` | built-in greeting | Greeting text, or `off` to hide it |
 | `server` / `data-server` | script origin | API server, if different from the script host |
 
 Theme it with CSS variables on the element: `--of-accent`, `--of-ink`, `--of-paper`. Dark mode follows the visitor's system setting.

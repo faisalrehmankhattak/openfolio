@@ -23,6 +23,32 @@
           ],
           "title": "Body",
           "type": "string"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Square portrait of the 3D avatar, shown on the launcher",
+          "title": "Image"
+        },
+        "photo": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Your real photo; the launcher blends it with image",
+          "title": "Photo"
         }
       },
       "required": [

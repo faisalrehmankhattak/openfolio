@@ -50,12 +50,14 @@ class Avatar(_Model):
     kind: Literal["mesh"] = "mesh"
     url: str = Field(min_length=1)
     body: Literal["M", "F"] = "M"
+    image: str | None = Field(default=None, description="Square portrait of the 3D avatar, shown on the launcher")
+    photo: str | None = Field(default=None, description="Your real photo; the launcher blends it with image")
 
-    @field_validator("url")
+    @field_validator("url", "image", "photo")
     @classmethod
-    def _relative_or_https(cls, url: str) -> str:
-        if "://" in url and not url.startswith(("https://", "http://localhost", "http://127.0.0.1")):
-            raise ValueError("avatar url must be relative to the server or use https")
+    def _relative_or_https(cls, url: str | None) -> str | None:
+        if url and "://" in url and not url.startswith(("https://", "http://localhost", "http://127.0.0.1")):
+            raise ValueError("avatar files must be relative to the server or use https")
         return url
 
 

@@ -2,11 +2,15 @@
 
 export type Mode = "bubble" | "inline";
 
+/** Which view the panel opens in. */
+export type Start = "voice" | "chat";
+
 export type MountOptions = {
   persona: string;
   server: string;
   assetBase: string;
   mode: Mode;
+  start?: Start;
   onClose?: () => void;
 };
 
@@ -16,7 +20,7 @@ export type PersonaInfo = {
   first_name: string;
   title: string;
   tagline: string;
-  avatar: { kind: "mesh"; url: string; body: "M" | "F" };
+  avatar: { kind: "mesh"; url: string; body: "M" | "F"; image?: string | null; photo?: string | null };
   quick_questions: { label: string; question: string }[];
 };
 

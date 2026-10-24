@@ -200,8 +200,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(body, status_code=200 if ok else 503)
 
     @app.get("/v1/personas/{persona_id}")
-    async def persona_info(persona_id: str) -> dict[str, Any]:
-        return get_persona(persona_id).public_view()
+    async def persona_info(persona_id: str) -> JSONResponse:
+        # Fetched by the launcher on every page view of the host site.
+        return JSONResponse(get_persona(persona_id).public_view(), headers={"Cache-Control": "public, max-age=300"})
 
     @app.get("/v1/personas/{persona_id}/ice-servers")
     async def ice_servers(persona_id: str, request: Request) -> JSONResponse:

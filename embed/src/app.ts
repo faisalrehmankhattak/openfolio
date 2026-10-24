@@ -862,5 +862,6 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
 
   setMicLook();
   setState("idle");
-  (opts.mode === "bubble" ? startBtn : null)?.focus();
+  if (opts.start === "chat") setChat(true);
+  else if (opts.mode === "bubble") startBtn.focus();
 }
