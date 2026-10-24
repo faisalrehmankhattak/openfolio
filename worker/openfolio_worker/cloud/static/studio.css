@@ -144,7 +144,7 @@ span.photo-preview { width: 168px; height: 168px; }
 .jump a:hover { border-color: var(--line-strong); color: var(--ink); }
 .profile-form { display: grid; gap: 20px; }
 .profile-form .panel { scroll-margin-top: 120px; }
-.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; align-items: start; }
 .form-grid-top, .form-top { margin-top: 18px; }
 .span-2 { grid-column: 1 / -1; }
 .rows { display: grid; gap: 12px; }
@@ -205,7 +205,7 @@ span.photo-preview { width: 168px; height: 168px; }
 .review-note-label { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #a86a00; margin-bottom: 4px !important; }
 .copy-field { margin-top: 20px; display: grid; gap: 8px; }
 .copy-field label { font-weight: 650; }
-.copy-field .hint { margin: 0; }
+.copy-field .hint { margin: 0; text-align: left; }
 .copy-row { display: flex; gap: 8px; align-items: stretch; }
 .copy-row .input { flex: 1; min-width: 0; }
 .snippet-box { resize: none; font-size: 13px; line-height: 1.5; }
@@ -229,7 +229,11 @@ span.photo-preview { width: 168px; height: 168px; }
 
 /* Join, login, reset */
 .auth-page { padding: 48px 20px 72px; }
-.auth-card { width: min(440px, 100%); display: grid; gap: 12px; }
+.auth-card { width: min(440px, 100%); display: grid; gap: 12px; padding: clamp(24px, 5vw, 36px); box-sizing: border-box; }
+/* A block, not cloud.css's flex row: flex gaps put stray spaces around the links in this sentence. */
+.auth-card .fine-print { display: block; text-align: center; }
+/* Hints read top to bottom with their field on these pages, so they sit on the left. */
+.auth-card .hint, .studio .hint { text-align: left; }
 .auth-card h1 { font-size: 26px; }
 .auth-card > p { margin: 0; }
 .input-prefix { display: flex; align-items: stretch; }
@@ -246,9 +250,10 @@ span.photo-preview { width: 168px; height: 168px; }
 .tab-sep { width: 1px; align-self: stretch; margin: 6px 4px; background: var(--line-strong); }
 .count-hot { background: #d9480f !important; color: #fff !important; }
 .member-table td { vertical-align: middle; }
+.member-table td a { white-space: nowrap; }
 .row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .review-list { list-style: none; margin: 0 0 24px; padding: 0; display: grid; gap: 14px; }
-.review-card { display: grid; gap: 12px; }
+.review-card { display: grid; gap: 12px; padding: 20px 22px; }
 .review-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .review-tagline { margin: 0; color: var(--ink-2); font-style: italic; }
 .review-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -280,8 +285,11 @@ span.photo-preview { width: 168px; height: 168px; }
   .row-card { padding: 14px 44px 2px 14px; }
   .step-item span:last-child, .timeline li span:last-child { font-size: 13px; }
   .stepper, .timeline { gap: 6px; }
-  .copy-row { flex-wrap: wrap; }
-  .copy-row .input { flex-basis: 100%; }
+  /* A row that wraps (field on top, buttons side by side below). cloud.css turns .copy-row into a column on
+     phones, where a 100% flex-basis stretches the field's height and pushes the buttons off the card. */
+  .copy-row { flex-direction: row; flex-wrap: wrap; }
+  .copy-row .input { flex: 1 1 100%; }
+  .copy-row .btn { flex: 1 1 0; justify-content: center; }
   .savebar { bottom: 10px; padding: 10px; }
   .savebar-note { display: none; }
   .savebar .btn { flex: 1; justify-content: center; }
