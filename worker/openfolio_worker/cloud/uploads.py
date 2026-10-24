@@ -146,19 +146,23 @@ class BodyTooLarge(Exception):
     pass
 
 
-def _capped(receive: Receive, limit: int) -> Receive:
-    seen = 0
+class _CappedReceive:
+    """Counts body bytes as they arrive and stops the stream once it passes the limit."""
 
-    async def wrapped() -> Message:
-        nonlocal seen
-        message = await receive()
+    def __init__(self, receive: Receive, limit: int) -> None:
+        self.receive = receive
+        self.limit = limit
+        self.seen = 0
+        self.exceeded = False
+
+    async def __call__(self) -> Message:
+        message = await self.receive()
         if message["type"] == "http.request":
-            seen += len(message.get("body", b""))
-            if seen > limit:
+            self.seen += len(message.get("body", b""))
+            if self.seen > self.limit:
+                self.exceeded = True  # remembered, in case the parser wraps the exception
                 raise BodyTooLarge
         return message
-
-    return wrapped
 
 
 async def read_multipart(request: Request, *, max_bytes: int = REQUEST_MAX_BYTES) -> FormData:
@@ -168,12 +172,13 @@ async def read_multipart(request: Request, *, max_bytes: int = REQUEST_MAX_BYTES
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > max_bytes:
         raise UploadError("request_too_large")
-    capped = Request(request.scope, _capped(request.receive, max_bytes))
+    receive = _CappedReceive(request.receive, max_bytes)
+    capped = Request(request.scope, receive)
     try:
         return await capped.form(max_files=1, max_fields=8, max_part_size=64 * 1024)
-    except BodyTooLarge as e:
-        raise UploadError("request_too_large") from e
-    except Exception as e:  # Starlette raises its own MultiPartException / HTTPException for broken bodies
+    except Exception as e:  # BodyTooLarge, or Starlette's MultiPartException / HTTPException for broken bodies
+        if receive.exceeded:
+            raise UploadError("request_too_large") from e
         raise UploadError("unsupported", "That upload was incomplete. Please try again.") from e
 
 

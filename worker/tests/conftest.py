@@ -61,6 +61,17 @@ def cloud_settings(settings: Settings, tmp_path: Path) -> Settings:
     return replace(settings, data_dir=tmp_path, inbox_dir=tmp_path / "inbox", cloud=cloud)
 
 
+@pytest.fixture(autouse=True)
+def _cheap_member_passwords(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Members' passwords use cheap scrypt parameters in tests, like the owner's."""
+
+    def cheap(password: str) -> str:
+        return hash_password(password, n=2**10)
+
+    monkeypatch.setattr("openfolio_worker.cloud.accounts.hash_password", cheap)
+    monkeypatch.setattr("openfolio_worker.cloud.studio_account.hash_password", cheap)
+
+
 @pytest.fixture
 def persona() -> Persona:
     return load_personas(PERSONAS)["faisal"]
