@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set noindex = true %}
+{% block title %}Choose a new password · Openfolio Cloud{% endblock %}
+{% block head %}<link rel="stylesheet" href="/cloud/static/studio.css?v={{ asset_version }}"><script src="/cloud/static/studio.js?v={{ asset_version }}" defer></script>{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% block main %}
+<section class="page-center auth-page">
+  {% if valid %}
+  <form class="card auth-card" method="post" novalidate>
+    <input type="hidden" name="form_token" value="{{ form_token }}">
+    <span class="notice-icon notice-ink">{{ icon("lock", 24) }}</span>
+    <h1>Choose a new password</h1>
+    <p class="muted">This signs you out on every device.</p>
+    <div class="field">
+      <label for="password">New password</label>
+      <div class="input-reveal"><input class="input" id="password" name="password" type="password" required minlength="12" autocomplete="new-password" autofocus aria-describedby="password-hint"{% if errors.get("password") %} aria-invalid="true"{% endif %}><button class="reveal" type="button" data-reveal="#password" aria-label="Show password">{{ icon("eye", 18) }}</button></div>
+      <p class="hint" id="password-hint">At least 12 characters.</p>
+      {% if errors.get("password") %}<p class="field-error">{{ icon("alert", 14) }}<span>{{ errors.password }}</span></p>{% endif %}
+    </div>
+    <button class="btn btn-primary btn-large btn-block" type="submit">Save new password</button>
+  </form>
+  {% else %}
+  <div class="card auth-card">
+    <span class="notice-icon notice-error">{{ icon("link", 24) }}</span>
+    <h1>This link isn't valid</h1>
+    <p class="muted">Reset links work once and expire after an hour.</p>
+    <a class="btn btn-primary btn-block" href="/login/forgot">Get a new link</a>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

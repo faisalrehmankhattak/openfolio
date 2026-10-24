@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set noindex = true %}
+{% block title %}Reset your password · Openfolio Cloud{% endblock %}
+{% block head %}<link rel="stylesheet" href="/cloud/static/studio.css?v={{ asset_version }}">{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% block main %}
+<section class="page-center auth-page">
+  {% if sent %}
+  <div class="card auth-card">
+    <span class="notice-icon notice-ok">{{ icon("mail", 24) }}</span>
+    <h1>Check your email</h1>
+    {% if mail %}
+    <p class="muted">If an account uses that address, we've sent a link to choose a new password. It works once, for one hour.</p>
+    {% else %}
+    <p class="muted">Email isn't set up on this server, so ask the site owner{% if contact_email %} (<a href="mailto:{{ contact_email }}">{{ contact_email }}</a>){% endif %} for a reset link.</p>
+    {% endif %}
+    <a class="btn btn-soft btn-block" href="/login">Back to sign-in</a>
+  </div>
+  {% else %}
+  <form class="card auth-card" method="post" action="/login/forgot" novalidate>
+    <input type="hidden" name="form_token" value="{{ form_token }}">
+    <span class="notice-icon notice-ink">{{ icon("lock", 24) }}</span>
+    <h1>Forgot your password?</h1>
+    <p class="muted">Enter your email and we'll send you a link to choose a new one.</p>
+    <div class="field">
+      <label for="email">Email</label>
+      <input class="input" id="email" name="email" type="email" autocomplete="username" required autofocus>
+    </div>
+    <button class="btn btn-primary btn-large btn-block" type="submit">Send reset link</button>
+    <p class="fine-print center"><a href="/login">Back to sign-in</a></p>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

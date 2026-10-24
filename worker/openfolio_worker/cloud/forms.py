@@ -35,17 +35,17 @@ class FormError(Exception):
         self.status = status
 
 
-async def read_form(request: Request) -> dict[str, str]:
-    """Parse a small URL-encoded form without a multipart dependency. The cap holds even when streamed."""
+async def read_form(request: Request, *, max_bytes: int = MAX_FORM_BYTES, max_fields: int = 30) -> dict[str, str]:
+    """Parse a small URL-encoded form. The cap holds even when streamed (uploads use uploads.read_multipart)."""
     if request.headers.get("content-type", "").split(";")[0].strip() != "application/x-www-form-urlencoded":
         raise FormError(415)
     body = b""
     async for chunk in request.stream():
         body += chunk
-        if len(body) > MAX_FORM_BYTES:
+        if len(body) > max_bytes:
             raise FormError(413)
     try:
-        fields = parse_qs(body.decode(), keep_blank_values=True, max_num_fields=30)
+        fields = parse_qs(body.decode(), keep_blank_values=True, max_num_fields=max_fields)
     except (UnicodeDecodeError, ValueError) as e:
         raise FormError(400) from e
     return {key: values[0] for key, values in fields.items()}

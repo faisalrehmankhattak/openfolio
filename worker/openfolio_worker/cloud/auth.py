@@ -133,6 +133,15 @@ class Keys:
             return None
         return Session(sid=sid, issued_at=issued)
 
+    def token_for(self, purpose: str, value: str) -> str:
+        """An HMAC of value for one purpose (member CSRF tokens, the signed-out form token)."""
+        return _b64(self._mac(purpose, value.encode()))
+
+    def check_token(self, purpose: str, value: str, token: str | None) -> bool:
+        if not token or not value:
+            return False
+        return hmac.compare_digest(self.token_for(purpose, value).encode(), token.encode())
+
     def csrf_token(self, session: Session) -> str:
         # Bound to the session id, so a token from another or an old session never passes.
         return _b64(self._mac("csrf", session.sid.encode()))

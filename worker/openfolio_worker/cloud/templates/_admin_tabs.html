@@ -1,0 +1,8 @@
+  <nav class="tabs" aria-label="Admin sections">
+    {% for name, label in (("pending", "Pending"), ("approved", "Approved"), ("rejected", "Rejected"), ("reviews", "Reviews"), ("members", "Members")) %}
+    {% if name == "reviews" %}<span class="tab-sep" aria-hidden="true"></span>{% endif %}
+    <a class="tab{% if name == tab %} is-active{% endif %}" href="/admin?tab={{ name }}"{% if name == tab %} aria-current="page"{% endif %}>
+      {{ label }} <span class="count{% if name == 'reviews' and counts.get('reviews') %} count-hot{% endif %}">{{ counts.get(name, 0) }}</span>
+    </a>
+    {% endfor %}
+  </nav>

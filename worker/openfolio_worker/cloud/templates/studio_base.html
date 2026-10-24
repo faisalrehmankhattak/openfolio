@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon, mark %}
+{% set noindex = true %}
+{% block title %}{% block page_title %}Studio{% endblock %} · Openfolio Studio{% endblock %}
+{% block body_class %}studio{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="/cloud/static/studio.css?v={{ asset_version }}">
+<script src="/cloud/static/studio.js?v={{ asset_version }}" defer></script>
+{% block extra_head %}{% endblock %}
+{% endblock %}
+{% block header %}
+<header class="site-header studio-header">
+  <div class="studio-bar">
+    <a class="brand" href="/studio" aria-label="Openfolio Studio, home">{{ mark(28) }}<span class="brand-name">Openfolio</span><span class="brand-tag">Studio</span></a>
+    <div class="studio-bar-end">
+      {% if record.status == "live" %}<a class="btn btn-ghost btn-small hide-sm" href="/p/{{ user.handle }}" target="_blank" rel="noopener">{{ icon("external", 16) }} View page</a>{% endif %}
+      <span class="who" title="{{ user.email }}"><span class="who-dot" aria-hidden="true">{{ (record.data.get('first_name') or user.handle)[:1]|upper }}</span><span class="who-handle">@{{ user.handle }}</span></span>
+      <form class="inline-form" method="post" action="/logout">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn btn-soft btn-small" type="submit">{{ icon("logout", 16) }}<span class="hide-sm">Sign out</span></button>
+      </form>
+    </div>
+  </div>
+</header>
+{% endblock %}
+{% block main %}
+<div class="studio-shell">
+  <nav class="snav" aria-label="Studio">
+    <ul class="snav-list">
+      {% for key, label, glyph in nav %}
+      <li><a class="snav-link{% if key == section %} is-active{% endif %}" href="/studio/{{ key }}"{% if key == section %} aria-current="page"{% endif %}>
+        {{ icon(glyph, 18) }}<span>{{ label }}</span>
+        {% if key == "publish" %}<span class="snav-status status-{{ record.status }}">{{ status_label }}</span>{% endif %}
+      </a></li>
+      {% endfor %}
+    </ul>
+    <div class="snav-card hide-md">
+      <p class="snav-card-title">Your page</p>
+      <p class="snav-card-url mono">/p/{{ user.handle }}</p>
+      <p class="snav-card-note">{% if record.status == "live" %}Live and answering visitors.{% elif record.status == "pending" %}Waiting for review.{% elif record.status == "paused" %}Paused by you.{% else %}Not public yet.{% endif %}</p>
+    </div>
+  </nav>
+  <div class="studio-content">
+    {% if message %}
+    <div class="toast{% if message_code in ('incomplete', 'draft_limit', 'no_sources', 'draft_running') %} toast-warn{% endif %}" role="status">{{ icon("check" if message_code not in ('incomplete', 'draft_limit', 'no_sources', 'draft_running') else "alert", 18) }}<p>{{ message }}</p></div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+{% endblock %}
+{% block footer %}
+<footer class="site-footer site-footer-quiet">
+  <div class="wrap footer-row">
+    <p class="footer-note">Openfolio Studio · invite-only beta. Your AI only says what you approve.</p>
+    <nav class="footer-nav" aria-label="Footer"><a href="/">Home</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav>
+  </div>
+</footer>
+{% endblock %}

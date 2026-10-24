@@ -1,0 +1,76 @@
+{% extends "admin_base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Reviews · Openfolio Cloud admin{% endblock %}
+{% block head %}<link rel="stylesheet" href="/cloud/static/studio.css?v={{ asset_version }}">{% endblock %}
+{% block header_actions %}
+<form class="inline-form" method="post" action="/admin/logout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="btn btn-ghost btn-small" type="submit">{{ icon("logout", 16) }} Sign out</button>
+</form>
+{% endblock %}
+{% block main %}
+<div class="wrap admin-main">
+  <div class="admin-title"><div><h1>Go-live reviews</h1><p class="muted">Pages waiting to go live. Open each one, try its AI, then approve or send it back with a note.</p></div></div>
+  {% if flash %}
+    {% if flash.kind == "reset" %}
+    <section class="flash flash-invite" role="status" aria-labelledby="flash-title">
+      <div class="flash-head">
+        <span class="flash-icon">{{ icon("lock", 20) }}</span>
+        <div>
+          <h2 id="flash-title">Reset link for @{{ flash.handle }}</h2>
+          <p>
+            {% if flash.emailed is sameas true %}It was emailed to {{ flash.email }}.
+            {% elif flash.emailed is sameas false %}The email to {{ flash.email }} failed. Send this link yourself.
+            {% else %}Send this link to {{ flash.email }}.
+            {% endif %}
+            It works once, for one hour, and is shown only this time.
+          </p>
+        </div>
+      </div>
+      <div class="copy-row">
+        <input class="input mono" id="reset-link" type="text" readonly value="{{ flash.link }}" aria-label="Reset link for @{{ flash.handle }}">
+        <button class="btn btn-primary" type="button" data-copy="#reset-link">{{ icon("link", 16) }} <span>Copy link</span></button>
+      </div>
+    </section>
+    {% else %}
+    <p class="flash flash-note" role="status">{{ icon("check", 18) }} <span>{{ flash.text }}</span></p>
+    {% endif %}
+  {% endif %}
+{% include "_admin_tabs.html" %}
+
+  {% if reviews %}
+  <ul class="review-list">
+    {% for r in reviews %}
+    <li class="card review-card">
+      <div class="review-top">
+        <div>
+          <p class="strong">{{ r.data.get("name") }} <span class="mono muted">@{{ r.handle }}</span></p>
+          <p class="muted small">{{ r.data.get("title") }} · submitted <time datetime="{{ r.submitted_at|iso }}" title="{{ r.submitted_at|when }}" data-local>{{ r.submitted_at|ago(now) }}</time>{% if r.live_before %} · <span class="badge badge-ok">update to a live page</span>{% endif %}</p>
+        </div>
+        <a class="btn btn-ghost btn-small" href="/admin/reviews/{{ r.id }}" target="_blank" rel="noopener">{{ icon("eye", 16) }} Preview</a>
+      </div>
+      {% if r.data.get("tagline") %}<p class="review-tagline">“{{ r.data.get("tagline") }}”</p>{% endif %}
+      {% if r.flags %}
+      <div class="callout callout-warn">{{ icon("shield", 18) }}<div><p><strong>{{ r.flags|length }} line{{ "s" if r.flags|length != 1 }} read like instructions to an AI.</strong></p>
+        <ul class="flag-list">{% for f in r.flags %}<li><span class="flag-field">{{ f.field }}</span> “{{ f.excerpt }}”{% if f.source == "ai" %} <span class="muted">(from the AI draft)</span>{% endif %}</li>{% endfor %}</ul></div></div>
+      {% endif %}
+      <div class="review-actions">
+        <form class="inline-form" method="post" action="/admin/reviews/{{ r.id }}/approve" data-confirm="Approve @{{ r.handle }}'s page? It goes live immediately.">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primary btn-small" type="submit">{{ icon("check", 16) }} Approve</button>
+        </form>
+        <form class="reject-form" method="post" action="/admin/reviews/{{ r.id }}/reject">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label class="sr-only" for="note-{{ r.id }}">Note for @{{ r.handle }}</label>
+          <input class="input" id="note-{{ r.id }}" name="note" type="text" maxlength="1000" placeholder="What should they change? (sent to them)">
+          <button class="btn btn-soft btn-small" type="submit">Send back</button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty"><span class="notice-icon notice-ink">{{ icon("check", 24) }}</span><p>Nothing to review. Submitted pages appear here{% if mail_enabled %} and you get an email{% endif %}.</p></div>
+  {% endif %}
+{% include "_admin_audit.html" %}
+</div>
+{% endblock %}

@@ -20,7 +20,7 @@ def add(db: CloudDB, email: str = "a@example.com", now: int = NOW) -> int:
 
 def test_schema_version_wal_and_reopen(tmp_path):
     db = CloudDB(tmp_path / "cloud.db")
-    assert db.schema_version == 1
+    assert db.schema_version == 2
     add(db)
     db.close()
     conn = sqlite3.connect(tmp_path / "cloud.db")

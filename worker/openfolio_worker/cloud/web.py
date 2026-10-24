@@ -18,9 +18,12 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoes
 
 from ..config import CloudSettings, Settings
 from ..persona import Persona
+from ..registry import PersonaRegistry
 from .auth import Keys
 from .db import CloudDB
 from .mail import Mailer
+from .store import StudioStore
+from .uploads import FileStore
 
 HERE = Path(__file__).resolve().parent
 TEMPLATES_DIR = HERE / "templates"
@@ -85,6 +88,12 @@ def asset_url(url: str | None) -> str:
     return url if "://" in url else "/" + url.lstrip("/")
 
 
+def _size(n: int) -> str:
+    if n >= 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f} MB"
+    return f"{max(1, round(n / 1024))} KB"
+
+
 def _asset_version() -> str:
     digest = hashlib.sha256()
     for path in sorted(STATIC_DIR.glob("*")):
@@ -100,7 +109,7 @@ def make_templates() -> Environment:
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    env.filters.update(when=_when, iso=_iso, ago=_ago, safe_url=safe_url, asset=asset_url)
+    env.filters.update(when=_when, iso=_iso, ago=_ago, safe_url=safe_url, asset=asset_url, size=_size)
     env.globals["asset_version"] = _asset_version()
     return env
 
@@ -112,7 +121,9 @@ class CloudContext:
     db: CloudDB
     keys: Keys
     mailer: Mailer
-    personas: dict[str, Persona]
+    registry: PersonaRegistry
+    store: StudioStore
+    files: FileStore
     client_ip: Callable[[Request], str]
     transport: httpx.AsyncBaseTransport | None = None
     clock: Callable[[], float] = time.time
@@ -126,7 +137,7 @@ class CloudContext:
 
     @property
     def demo(self) -> Persona | None:
-        return self.personas.get(self.cloud.demo_persona)
+        return self.registry.files.get(self.cloud.demo_persona)
 
     @property
     def contact_email(self) -> str | None:
@@ -135,6 +146,11 @@ class CloudContext:
     @property
     def landing_csp(self) -> str:
         return landing_csp(bool(self.cloud.turnstile_site_key))
+
+    @property
+    def widget_csp(self) -> str:
+        """Pages that run the widget (Studio preview, public profiles): the landing page's exceptions only."""
+        return landing_csp(False)
 
     def render(
         self,

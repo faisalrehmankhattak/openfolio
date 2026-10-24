@@ -1,0 +1,214 @@
+{% extends "studio_base.html" %}
+{% from "_icons.html" import icon %}
+{% block page_title %}Profile{% endblock %}
+
+{% macro err(key) %}{% if errors.get(key) %}<p class="field-error" id="{{ key }}-error">{{ icon("alert", 14) }}<span>{{ errors[key] }}</span></p>{% endif %}{% endmacro %}
+{% macro inv(key) %}{% if errors.get(key) %} aria-invalid="true" aria-describedby="{{ key }}-error"{% endif %}{% endmacro %}
+{% macro text(key, label, value, hint=None, max=None, placeholder="", type="text", optional=False) %}
+<div class="field">
+  <label for="f-{{ key }}">{{ label }}{% if optional %} <span class="optional">Optional</span>{% endif %}</label>
+  <input class="input" id="f-{{ key }}" name="{{ key }}" type="{{ type }}" value="{{ value }}"{% if max %} maxlength="{{ max }}"{% endif %}{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}{{ inv(key) }}>
+  {% if hint %}<p class="hint">{{ hint }}</p>{% endif %}{{ err(key) }}
+</div>
+{% endmacro %}
+{% macro area(key, label, value, hint=None, rows=4, max=None, placeholder="", optional=False) %}
+<div class="field">
+  <label for="f-{{ key }}">{{ label }}{% if optional %} <span class="optional">Optional</span>{% endif %}</label>
+  <textarea class="input textarea" id="f-{{ key }}" name="{{ key }}" rows="{{ rows }}"{% if max %} maxlength="{{ max }}"{% endif %}{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}{{ inv(key) }}>{{ value }}</textarea>
+  {% if hint %}<p class="hint">{{ hint }}</p>{% endif %}{{ err(key) }}
+</div>
+{% endmacro %}
+{% macro cell(group, i, name, label, value, max, placeholder="", wide=False, multiline=False) %}
+{% set key = group ~ "-" ~ i ~ "-" ~ name %}
+<div class="field{% if wide %} span-2{% endif %}">
+  <label for="f-{{ key }}">{{ label }}</label>
+  {% if multiline %}<textarea class="input textarea" id="f-{{ key }}" name="{{ key }}" rows="3" maxlength="{{ max }}"{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}{{ inv(key) }}>{{ value }}</textarea>
+  {% else %}<input class="input" id="f-{{ key }}" name="{{ key }}" type="text" value="{{ value }}" maxlength="{{ max }}"{% if placeholder %} placeholder="{{ placeholder }}"{% endif %}{{ inv(key) }}>{% endif %}
+  {{ err(key) }}
+</div>
+{% endmacro %}
+{% macro remove(label) %}<button class="icon-btn row-remove" type="button" data-remove-row aria-label="{{ label }}">{{ icon("x", 16) }}</button>{% endmacro %}
+
+{% macro role_row(i, r) %}
+<div class="row-card" data-row>
+  {{ remove("Remove this role") }}
+  <div class="row-grid">
+    {{ cell("experience", i, "title", "Title", r.get("title", ""), 120, "Senior Product Designer") }}
+    {{ cell("experience", i, "company", "Company", r.get("company", ""), 120, "Acme") }}
+    {{ cell("experience", i, "period", "Period", r.get("period", ""), 60, "2022 to present") }}
+    {{ cell("experience", i, "summary", "What you did", r.get("summary", ""), 700, "One or two sentences, with a result if you can.", wide=True, multiline=True) }}
+  </div>
+</div>
+{% endmacro %}
+{% macro project_row(i, p) %}
+<div class="row-card" data-row>
+  {{ remove("Remove this project") }}
+  <div class="row-grid">
+    {{ cell("projects", i, "name", "Project", p.get("name", ""), 120, "Checkout redesign") }}
+    {{ cell("projects", i, "org", "For", p.get("org", ""), 100, "Company or client") }}
+    {{ cell("projects", i, "period", "When", p.get("period", ""), 60, "2024") }}
+    {{ cell("projects", i, "url", "Link", p.get("url", ""), 300, "https://") }}
+    {{ cell("projects", i, "summary", "Summary", p.get("summary", ""), 700, "What it is and your part in it.", wide=True, multiline=True) }}
+    {{ cell("projects", i, "metric", "Result", p.get("metric", ""), 200, "Conversion up 18%", wide=True) }}
+  </div>
+</div>
+{% endmacro %}
+{% macro skill_row(i, s) %}
+<div class="row-card row-inline" data-row>
+  {{ remove("Remove this group") }}
+  <div class="row-grid row-grid-skills">
+    {{ cell("skills", i, "group", "Group", s.get("group", ""), 60, "Design") }}
+    {{ cell("skills", i, "items", "Skills, separated by commas", s.get("items", ""), 1600, "Figma, Prototyping, Design systems") }}
+  </div>
+</div>
+{% endmacro %}
+{% macro link_row(i, l) %}
+<div class="row-card row-inline" data-row>
+  {{ remove("Remove this link") }}
+  <div class="row-grid row-grid-links">
+    {{ cell("links", i, "label", "Label", l.get("label", ""), 60, "LinkedIn") }}
+    {{ cell("links", i, "url", "Address", l.get("url", ""), 300, "https://linkedin.com/in/you") }}
+  </div>
+</div>
+{% endmacro %}
+{% macro quick_row(i, q) %}
+<div class="row-card row-inline" data-row>
+  {{ remove("Remove this question") }}
+  <div class="row-grid row-grid-quick">
+    {{ cell("quick", i, "label", "Button", q.get("label", ""), 24, "Projects") }}
+    {{ cell("quick", i, "question", "Question it asks", q.get("question", ""), 200, "What are you proudest of building?") }}
+  </div>
+</div>
+{% endmacro %}
+{% macro repeat(group, rows, row_macro, add_label, limit) %}
+<div class="rows" data-rows="{{ group }}" data-next="{{ rows|length }}" data-limit="{{ limit }}">
+  {% for r in rows %}{{ row_macro(loop.index0, r) }}{% endfor %}
+</div>
+{{ err(group) }}
+<template id="tpl-{{ group }}">{{ row_macro("__i__", {}) }}</template>
+<button class="btn btn-soft btn-small add-row" type="button" data-add-row="{{ group }}" hidden>{{ icon("plus", 16) }} {{ add_label }}</button>
+{% endmacro %}
+
+{% block content %}
+<header class="page-head page-head-row">
+  <div>
+    <p class="kicker">Profile</p>
+    <h1>Your story, in your words</h1>
+    <p class="page-lead">Everything your AI knows comes from this page. It never invents facts beyond it.</p>
+  </div>
+  <a class="btn btn-ghost hide-sm" href="/studio/preview">{{ icon("play", 16) }} Preview</a>
+</header>
+
+{% if errors %}
+<div class="alert alert-error" role="alert">{{ icon("alert", 18) }}<p>Please fix the {{ errors|length }} highlighted field{{ "s" if errors|length != 1 }}. Nothing was saved yet.</p></div>
+{% endif %}
+
+{% if record.drafted_at and message_code == "drafted" %}
+<div class="callout callout-ai">{{ icon("sparkle", 18) }}<div><p><strong>Drafted by AI from your documents.</strong> Read every line: fix anything wrong, remove anything you wouldn't say to a recruiter, then save.</p></div></div>
+{% endif %}
+
+{% if flags %}
+<div class="callout callout-warn" role="note">
+  {{ icon("shield", 18) }}
+  <div>
+    <p><strong>Some text reads like an instruction to an AI.</strong> Your AI treats this page as facts about you, so reword these lines. The reviewer sees this note too.</p>
+    <ul class="flag-list">{% for f in flags %}<li><span class="flag-field">{{ f.field }}</span> “{{ f.excerpt }}”</li>{% endfor %}</ul>
+  </div>
+</div>
+{% endif %}
+
+<nav class="jump" aria-label="Profile sections">
+  <a href="#basics">Basics</a><a href="#about">About</a><a href="#experience">Experience</a><a href="#projects">Projects</a><a href="#skills">Skills</a><a href="#links">Links</a><a href="#conversation">Conversation</a><a href="#avatar">Avatar and voice</a>
+</nav>
+
+<form class="profile-form" method="post" action="/studio/profile" novalidate data-profile-form>
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <section class="panel" id="basics" aria-labelledby="basics-title">
+    <h2 id="basics-title" class="panel-title">Basics</h2>
+    <div class="form-grid">
+      {{ text("name", "Full name", form.name, max=80, placeholder="Jane Doe") }}
+      {{ text("first_name", "First name", form.first_name, hint="How your AI refers to you.", max=40) }}
+      {{ text("title", "Title", form.title, max=120, placeholder="Senior Product Designer") }}
+      {{ text("pronouns", "Pronouns", form.pronouns, max=30, placeholder="she/her", optional=True) }}
+      <div class="span-2">{{ text("tagline", "Tagline", form.tagline, hint="One sentence: what you do and what sets you apart.", max=200) }}</div>
+    </div>
+  </section>
+
+  <section class="panel" id="about" aria-labelledby="about-title">
+    <h2 id="about-title" class="panel-title">About</h2>
+    {{ area("about", "About you", form.about, hint="Two to four sentences, in the first person.", rows=5, max=2500) }}
+    {{ area("highlights", "Highlights", form.highlights, hint="One per line. Concrete results with numbers work best.", rows=4, optional=True) }}
+  </section>
+
+  <section class="panel" id="experience" aria-labelledby="experience-title">
+    <h2 id="experience-title" class="panel-title">Experience</h2>
+    <p class="panel-sub">Most recent first.</p>
+    {{ repeat("experience", form.experience, role_row, "Add a role", 15) }}
+  </section>
+
+  <section class="panel" id="projects" aria-labelledby="projects-title">
+    <h2 id="projects-title" class="panel-title">Projects</h2>
+    <p class="panel-sub">What you'd love a recruiter to ask about.</p>
+    {{ repeat("projects", form.projects, project_row, "Add a project", 12) }}
+  </section>
+
+  <section class="panel" id="skills" aria-labelledby="skills-title">
+    <h2 id="skills-title" class="panel-title">Skills</h2>
+    {{ repeat("skills", form.skills, skill_row, "Add a group", 8) }}
+    <div class="form-grid form-grid-top">
+      {{ area("education", "Education", form.education, hint="One per line.", rows=3, optional=True) }}
+      {{ area("awards", "Recognition", form.awards, hint="Awards, talks, publications. One per line.", rows=3, optional=True) }}
+    </div>
+  </section>
+
+  <section class="panel" id="links" aria-labelledby="links-title">
+    <h2 id="links-title" class="panel-title">Links and contact</h2>
+    {{ repeat("links", form.links, link_row, "Add a link", 10) }}
+    <div class="form-grid form-grid-top">
+      {{ text("email", "Contact email", form.email, hint="Shared by your AI when someone asks how to reach you.", max=254, type="email", optional=True) }}
+      {{ text("booking_url", "Booking link", form.booking_url, hint="A Calendly or similar page.", max=300, placeholder="https://", optional=True) }}
+    </div>
+  </section>
+
+  <section class="panel" id="conversation" aria-labelledby="conversation-title">
+    <h2 id="conversation-title" class="panel-title">Conversation</h2>
+    <p class="panel-sub">Suggested questions appear as buttons in the chat (up to six).</p>
+    {{ repeat("quick", form.quick, quick_row, "Add a question", 6) }}
+    <div class="form-top">
+      {{ area("guardrails", "Topics to avoid", form.guardrails, hint="One rule per line, such as “Never discuss salary expectations.” Your AI follows them strictly.", rows=3, optional=True) }}
+    </div>
+  </section>
+
+  <section class="panel" id="avatar" aria-labelledby="avatar-title">
+    <h2 id="avatar-title" class="panel-title">Avatar and voice</h2>
+    <div class="avatar-grid">
+      <div class="avatar-photo">
+        {% if photo_url %}<img src="{{ photo_url }}" alt="Your photo" width="96" height="96">{% else %}<span class="photo-empty" aria-hidden="true">{{ icon("user", 36) }}</span>{% endif %}
+        <div><p class="strong">Your photo</p><a href="/studio/setup#photo">{{ "Change photo" if photo_url else "Add a photo" }}</a></div>
+      </div>
+      <fieldset class="field choice-group">
+        <legend>3D avatar body</legend>
+        <label class="choice"><input type="radio" name="body" value="M"{% if form.body != "F" %} checked{% endif %}><span>Masculine</span></label>
+        <label class="choice"><input type="radio" name="body" value="F"{% if form.body == "F" %} checked{% endif %}><span>Feminine</span></label>
+        {{ err("body") }}
+      </fieldset>
+      <div class="field">
+        <label for="f-voice">Voice</label>
+        <select class="input select" id="f-voice" name="voice"{{ inv("voice") }}>
+          <option value="">Default voice</option>
+          {% for value, label in voices %}<option value="{{ value }}"{% if form.voice == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <p class="hint">Try it on the Preview page.</p>
+        {{ err("voice") }}
+      </div>
+    </div>
+  </section>
+
+  <div class="savebar">
+    <p class="savebar-note" data-dirty-note>{{ icon("check", 16) }} All changes are saved when you press Save.</p>
+    <a class="btn btn-ghost hide-sm" href="/studio/preview">{{ icon("play", 16) }} Preview</a>
+    <button class="btn btn-primary" type="submit">Save profile</button>
+  </div>
+</form>
+{% endblock %}

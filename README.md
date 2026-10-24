@@ -217,7 +217,7 @@ The same server can run Openfolio Cloud, the hosted, invite-only version. `CLOUD
 1. A visitor joins the waitlist: name, email, portfolio, what they do and, optionally, why. A hidden honeypot field, 3 requests per network per hour, one pending request per email and, when configured, [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) keep spam out. Every outcome shows the same thank-you page.
 2. You get an email (optional SMTP) and review the request at `/admin`.
 3. **Approve** creates a personal, single-use invite link that expires after 7 days. Only its SHA-256 hash is stored. It is emailed when SMTP is set and always shown once with a Copy button. **Reject** revokes any open invite; **Delete** erases the request and its invites. Every action goes to an audit log on the same page.
-4. The invite link confirms the approval. Stage 2 (the Studio, where approved people build their AI version) will accept it.
+4. The invite link opens `/join/{token}`, where the person picks a handle and a password and lands in the Studio (below).
 
 Requests live in SQLite at `DATA_DIR/cloud.db`. IP addresses are stored only as hashes salted with `SESSION_SECRET`. Rejected requests are deleted after 90 days and unused invites 30 days after they expire, at startup and every 24 hours. The admin session is an HMAC-signed, HttpOnly, `SameSite=Strict` cookie (12 hours), every admin form carries a CSRF token, and 5 failed sign-ins from one network lock it out for 15 minutes.
 
@@ -236,6 +236,20 @@ Requests live in SQLite at `DATA_DIR/cloud.db`. IP addresses are stored only as 
 For search engines and AI assistants, the cloud serves `/robots.txt` (public pages open to Googlebot, Bingbot, GPTBot, ClaudeBot, PerplexityBot and others; admin, invite and form paths closed), `/sitemap.xml`, `/llms.txt` and `/llms-full.txt` ([llmstxt.org](https://llmstxt.org) format), `/.well-known/security.txt`, JSON-LD on every public page, and three guides: `/guides/ai-portfolio`, `/guides/portfolio-for-recruiters` and `/compare`.
 
 Cloud pages send a Content Security Policy with only `'self'`, no inline scripts and `frame-ancestors 'none'`, plus `X-Frame-Options: DENY`; admin and invite pages are `no-store`. The landing page runs the live widget, so its policy also allows inline `<style>` elements (the widget styles its shadow DOM at runtime) and `blob:` fetches (the 3D head loads its textures through blob URLs), and Turnstile's origin when it is on. No `eval` is allowed anywhere.
+
+### Studio
+
+Approved members build their page and AI version in the Studio at `/studio`:
+
+1. **Setup**: upload a résumé, a LinkedIn "Save to PDF" export or a portfolio document (or paste text), plus a photo.
+2. **Draft**: the configured LLM drafts the profile from those documents only, in the background (Setup shows progress). Text that reads like instructions to an AI is flagged for the member and the owner.
+3. **Profile**: the member checks and edits every field. **Preview** runs the real widget on the saved copy, visible only to them (`/v1/personas/{handle}~preview`).
+4. **Publish**: submitting sends the page to the owner's **Reviews** tab. The owner opens it, tries its AI, then approves or sends it back with a note (emailed when SMTP is set). Approved pages go live at `/p/{handle}` with JSON-LD, a Markdown twin at `/p/{handle}.md` and the sitemap; later edits go through review again while the approved version stays live. Members can pause their page or hide it from search engines.
+5. **Account**: change the password, download everything as a zip, or delete the account. Deletion erases the profile, the files on disk, sessions, reset links and the original access request. The owner can pause, reset or delete members from the **Members** tab.
+
+Uploads: PDF up to 10 MB and 30 pages, Word `.docx` 5 MB, text 200 KB, photos (JPEG, PNG, WebP) 5 MB; 10 files and 30 MB per member, and 12 MB per request, enforced while the body streams in. Types are checked by their magic bytes, not the name. PDF, DOCX and image parsing runs in a child process with CPU, memory, file-size and process limits, photos are re-encoded without EXIF (no location data) and cropped to 512 px, and a photo is public only once the page is live. Member sessions are HttpOnly, `SameSite=Lax` cookies stored hashed; every form carries a CSRF token and an origin check.
+
+Two limits to know: draft jobs are tracked in memory, so run **one replica** (`railway.toml` does); a restart marks a running draft as interrupted and the member drafts again. The parser's memory cap (`RLIMIT_AS`) is not enforced on macOS, so local development relies on the time limit; the Linux Docker image enforces both.
 
 ### Deploy to Railway
 

@@ -1,0 +1,55 @@
+{% extends "studio_base.html" %}
+{% from "_icons.html" import icon %}
+{% block page_title %}Preview{% endblock %}
+{% set d = record.data %}
+{% set photo = (d.get("avatar") or {}).get("photo") %}
+{% block content %}
+<header class="page-head">
+  <p class="kicker">Preview</p>
+  <h1>Talk to your AI</h1>
+  <p class="page-lead">This is the real widget running your latest saved profile. Only you can see it until your page is live.</p>
+</header>
+
+{% if missing %}
+<div class="callout callout-warn">{{ icon("alert", 18) }}<div><p><strong>Your profile is missing {{ missing|join(", ") }}.</strong> The preview works, but add these before you submit.</p></div></div>
+{% endif %}
+
+<div class="preview-grid">
+  <section class="panel stage" aria-labelledby="stage-title">
+    <div class="stage-glow" aria-hidden="true"></div>
+    <div class="stage-card">
+      <div class="stage-avatar">
+        {% if photo %}<img src="/{{ photo }}" alt="" width="104" height="104">{% else %}<span class="photo-empty">{{ icon("user", 40) }}</span>{% endif %}
+        <span class="ai-chip">AI</span>
+      </div>
+      <h2 id="stage-title" class="stage-name">{{ d.get("name") or user.handle }}</h2>
+      <p class="stage-title">AI version · {{ d.get("title") or "Add a title in your profile" }}</p>
+      <div class="stage-actions">
+        <button class="btn btn-primary btn-large" type="button" data-demo="voice">{{ icon("mic", 18) }} Talk</button>
+        <button class="btn btn-ghost btn-large" type="button" data-demo="chat">{{ icon("chat", 18) }} Chat</button>
+      </div>
+      <p class="fine-print">Voice needs your microphone. The launcher in the corner is what visitors see.</p>
+    </div>
+  </section>
+
+  <aside class="preview-side">
+    <section class="panel">
+      <h2 class="panel-title">Try these</h2>
+      <ul class="try-list">
+        {% for q in questions[:6] %}<li>{{ icon("chat", 16) }}<span>{{ q.question }}</span></li>{% endfor %}
+        <li>{{ icon("chat", 16) }}<span>Can you write me a poem? <em class="muted">(it should politely decline)</em></span></li>
+      </ul>
+    </section>
+    <section class="panel">
+      <h2 class="panel-title">What to check</h2>
+      <ul class="check-list">
+        <li>{{ icon("check", 16) }} It says it's an AI version of you.</li>
+        <li>{{ icon("check", 16) }} Answers match your profile, with no invented facts.</li>
+        <li>{{ icon("check", 16) }} It sounds like you. If not, edit your about and tagline.</li>
+      </ul>
+      <a class="btn btn-soft btn-small" href="/studio/profile">{{ icon("edit", 16) }} Edit profile</a>
+    </section>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/embed/embed.js" data-persona="{{ widget_id }}" data-teaser="off" async></script>{% endblock %}

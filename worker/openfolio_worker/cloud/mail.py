@@ -52,17 +52,48 @@ def new_request_email(req: AccessRequest, admin_url: str) -> tuple[str, str]:
     return subject, "\n".join(lines) + "\n"
 
 
+def _first(name: str) -> str:
+    return name.split()[0] if name.split() else "there"
+
+
 def invite_email(name: str, link: str, expires_at: int) -> tuple[str, str]:
     expires = datetime.fromtimestamp(expires_at, UTC).strftime("%d %B %Y")
-    first = name.split()[0] if name.split() else "there"
     body = (
-        f"Hi {first},\n\n"
+        f"Hi {_first(name)},\n\n"
         "You're approved for the Openfolio Cloud beta.\n\n"
-        f"Your personal invite link (works once, until {expires}):\n{link}\n\n"
-        "The Studio, where you add your story and avatar, opens soon. We'll email you when it does.\n\n"
+        f"Create your account with this personal link (works once, until {expires}):\n{link}\n\n"
+        "Then upload your résumé and a photo, and the Studio drafts your AI version for you to review.\n\n"
         "If you didn't ask for this, you can ignore this email.\n"
     )
     return "You're approved for Openfolio Cloud", body
+
+
+def reset_email(name: str, link: str) -> tuple[str, str]:
+    body = (
+        f"Hi {_first(name)},\n\n"
+        "Someone asked to reset the password of your Openfolio Cloud account.\n\n"
+        f"Choose a new password with this link (works once, for one hour):\n{link}\n\n"
+        "If it wasn't you, ignore this email; your password stays the same.\n"
+    )
+    return "Reset your Openfolio Cloud password", body
+
+
+def review_email(name: str, approved: bool, note: str, page_url: str, studio_url: str) -> tuple[str, str]:
+    if approved:
+        subject = "Your Openfolio page is live"
+        text = (
+            f"Good news: your AI portfolio is approved and live at\n{page_url}\n\n"
+            f"Your embed snippet is in the Studio: {studio_url}\n"
+        )
+    else:
+        subject = "Your Openfolio page needs a few changes"
+        text = (
+            "Your AI portfolio isn't live yet. Please make a few changes in the Studio and submit it again:\n"
+            f"{studio_url}\n"
+        )
+    if note:
+        text += f"\nNote from the reviewer:\n{note}\n"
+    return subject, f"Hi {_first(name)},\n\n{text}"
 
 
 class Mailer:

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set noindex = true %}
+{% block title %}Create your account · Openfolio Cloud{% endblock %}
+{% block head %}<link rel="stylesheet" href="/cloud/static/studio.css?v={{ asset_version }}"><script src="/cloud/static/studio.js?v={{ asset_version }}" defer></script>{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% macro err(key) %}{% if errors.get(key) %}<p class="field-error" id="{{ key }}-error">{{ icon("alert", 14) }}<span>{{ errors[key] }}</span></p>{% endif %}{% endmacro %}
+{% block main %}
+<section class="page-center auth-page">
+  <form class="card auth-card" method="post" novalidate>
+    <input type="hidden" name="form_token" value="{{ form_token }}">
+    <span class="notice-icon notice-ok">{{ icon("sparkle", 24) }}</span>
+    <h1>Welcome{% if first_name %}, {{ first_name }}{% endif %}</h1>
+    <p class="muted">Create your account. Next, you'll upload your résumé and a photo, and we'll draft your AI.</p>
+    {% if errors.get("email") %}<div class="alert alert-error" role="alert">{{ icon("alert", 18) }}<p>{{ errors.email }} <a href="/login">Sign in</a></p></div>{% endif %}
+    <div class="field">
+      <label for="email">Email</label>
+      <input class="input" id="email" type="email" value="{{ email }}" readonly aria-readonly="true" autocomplete="username">
+      <p class="hint">From your invite. You'll sign in with it.</p>
+    </div>
+    <div class="field">
+      <label for="handle">Your handle</label>
+      <div class="input-prefix"><span class="prefix mono">/p/</span><input class="input mono" id="handle" name="handle" type="text" value="{{ values.handle }}" required minlength="3" maxlength="30" pattern="[a-z0-9][a-z0-9-]{1,28}[a-z0-9]" autocapitalize="none" autocomplete="off" spellcheck="false" aria-describedby="handle-hint{% if errors.get('handle') %} handle-error{% endif %}"{% if errors.get("handle") %} aria-invalid="true"{% endif %}></div>
+      <p class="hint" id="handle-hint">Your page's address: {{ public_url }}/p/<strong data-handle-echo>{{ values.handle or "you" }}</strong>. Lowercase letters, numbers and hyphens.</p>
+      {{ err("handle") }}
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <div class="input-reveal"><input class="input" id="password" name="password" type="password" required minlength="12" autocomplete="new-password" aria-describedby="password-hint{% if errors.get('password') %} password-error{% endif %}"{% if errors.get("password") %} aria-invalid="true"{% endif %}><button class="reveal" type="button" data-reveal="#password" aria-label="Show password">{{ icon("eye", 18) }}</button></div>
+      <p class="hint" id="password-hint">At least 12 characters. A short sentence is easy to remember.</p>
+      {{ err("password") }}
+    </div>
+    <button class="btn btn-primary btn-large btn-block" type="submit">Create account {{ icon("arrow", 18) }}</button>
+    <p class="fine-print center">By creating an account you agree to the <a href="/terms">terms</a> and <a href="/privacy">privacy policy</a>.</p>
+  </form>
+</section>
+{% endblock %}

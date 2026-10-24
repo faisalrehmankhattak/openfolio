@@ -63,6 +63,7 @@
         <a class="nav-link" href="/#faq">FAQ</a>
         {% set stars = seo.stars() %}
         <a class="gh-link" href="{{ github_url }}" rel="noopener">{{ icon("github", 18) }}<span class="gh-label">GitHub</span>{% if stars %}<span class="gh-count" aria-label="{{ stars }} stars">{{ icon("star", 13) }}{{ stars }}</span>{% endif %}</a>
+        <a class="nav-link" href="/login">Sign in</a>
         <a class="btn btn-primary btn-small" href="/#request">Join the waitlist</a>
       </nav>
     </div>

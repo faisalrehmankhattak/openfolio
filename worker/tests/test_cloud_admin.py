@@ -180,21 +180,24 @@ def test_new_invite_replaces_the_old_one(client, cloud_settings):
     login(client)
     first = approve(client, cloud_settings)
     second = approve(client, cloud_settings)
-    assert client.get(f"/invite/{first}").status_code == 404
-    assert client.get(f"/invite/{second}").status_code == 200
+    assert client.get(f"/join/{first}").status_code == 404
+    assert client.get(f"/join/{second}").status_code == 200
 
 
 def test_invite_pages(client, cloud_settings):
     submit(client)
     login(client)
     token = approve(client, cloud_settings)
-    valid = client.get(f"/invite/{token}")
+    valid = client.get(f"/join/{token}")
     assert valid.status_code == 200
-    assert "You're approved, Jane." in valid.text
-    assert "The Studio opens soon; we'll email you." in valid.text
-    assert valid.headers["referrer-policy"] == "no-referrer"
+    assert "Welcome, Jane" in valid.text
+    assert 'value="jane@example.com" readonly' in valid.text
+    assert valid.headers["referrer-policy"] == "same-origin"  # not to other sites, and the form's Origin survives
     assert valid.headers["cache-control"] == "no-store"
-    assert client.get(f"/invite/{token}").status_code == 200  # stage 2 consumes it; viewing does not
+    assert client.get(f"/join/{token}").status_code == 200  # creating the account consumes it; viewing does not
+    old = client.get(f"/invite/{token}", follow_redirects=False)  # links emailed by stage 1
+    assert old.status_code == 303
+    assert old.headers["location"] == f"/join/{token}"
 
     def invalid(path: str) -> None:
         r = client.get(path)
@@ -202,22 +205,22 @@ def test_invite_pages(client, cloud_settings):
         assert "This link isn't valid." in r.text
         assert "Jane" not in r.text
 
-    invalid("/invite/garbage")
-    invalid("/invite/" + "A" * 43)
-    invalid("/invite/" + token + "x")
+    invalid("/join/garbage")
+    invalid("/join/" + "A" * 43)
+    invalid("/join/" + token + "x")
     hashed = hashlib.sha256(token.encode()).hexdigest()
     import sqlite3
 
     conn = sqlite3.connect(cloud_settings.data_dir / "cloud.db")
     conn.execute("UPDATE invites SET expires_at = ? WHERE token_hash = ?", (int(time.time()) - 1, hashed))
     conn.commit()
-    invalid(f"/invite/{token}")  # expired
+    invalid(f"/join/{token}")  # expired
     conn.execute(
         "UPDATE invites SET expires_at = ?, used_at = ? WHERE token_hash = ?",
         (int(time.time()) + 3600, int(time.time()), hashed),
     )
     conn.commit()
-    invalid(f"/invite/{token}")  # used
+    invalid(f"/join/{token}")  # used
     conn.close()
 
 
@@ -229,7 +232,7 @@ def test_reject_revokes_the_invite(client, cloud_settings):
     assert r.status_code == 303
     assert rows(cloud_settings, "SELECT status FROM access_requests") == [("rejected",)]
     assert rows(cloud_settings, "SELECT COUNT(*) FROM invites") == [(0,)]
-    assert client.get(f"/invite/{token}").status_code == 404
+    assert client.get(f"/join/{token}").status_code == 404
     assert "Rejected Jane Doe" in client.get(r.headers["location"]).text
 
 

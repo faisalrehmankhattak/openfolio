@@ -2,7 +2,8 @@
 
 One connection guarded by a lock, used from worker threads (CloudDB.run), so a slow disk never
 blocks the event loop. WAL mode lets readers continue during a write. PRAGMA user_version records
-the schema version; stage 2 appends a migration to MIGRATIONS instead of editing an old one.
+the schema version; each stage appends a migration to MIGRATIONS instead of editing an old one.
+Stage 2 (the Studio) adds members, their sessions, files, personas and reviews; store.py reads them.
 Times are Unix seconds (UTC).
 """
 
@@ -70,6 +71,74 @@ MIGRATIONS: tuple[str, ...] = (
         expires_at INTEGER NOT NULL
     );
     """,
+    # Stage 2: the Studio. Deleting a user cascades to everything they own.
+    """
+    CREATE TABLE users (
+        id INTEGER PRIMARY KEY,
+        handle TEXT NOT NULL UNIQUE,
+        email TEXT NOT NULL UNIQUE,
+        name TEXT NOT NULL DEFAULT '',
+        password_hash TEXT NOT NULL,
+        request_id INTEGER REFERENCES access_requests (id) ON DELETE SET NULL,
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused')),
+        created_at INTEGER NOT NULL,
+        last_active_at INTEGER
+    );
+    CREATE TABLE user_sessions (
+        sid_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+    );
+    CREATE INDEX user_sessions_user ON user_sessions (user_id);
+    CREATE TABLE password_resets (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        used_at INTEGER
+    );
+    CREATE INDEX password_resets_user ON password_resets (user_id);
+    CREATE TABLE files (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('photo', 'document')),
+        stored_name TEXT NOT NULL UNIQUE,
+        original_name TEXT NOT NULL,
+        mime TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        text TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL
+    );
+    CREATE INDEX files_user ON files (user_id, kind);
+    CREATE TABLE personas (
+        user_id INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+        handle TEXT NOT NULL UNIQUE,
+        data TEXT NOT NULL,
+        live_data TEXT,
+        status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'pending', 'live', 'rejected', 'paused')),
+        show_in_search INTEGER NOT NULL DEFAULT 1,
+        flags TEXT NOT NULL DEFAULT '[]',
+        drafted_at INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        published_at INTEGER
+    );
+    CREATE INDEX personas_status ON personas (status);
+    CREATE TABLE reviews (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+        data TEXT NOT NULL,
+        flags TEXT NOT NULL DEFAULT '[]',
+        submitted_at INTEGER NOT NULL,
+        decided_at INTEGER,
+        decision TEXT CHECK (decision IN ('approved', 'rejected')),
+        note TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX reviews_open ON reviews (decided_at, submitted_at);
+    CREATE INDEX reviews_user ON reviews (user_id, id);
+    ALTER TABLE audit_log ADD COLUMN user_id INTEGER;
+    """,
 )
 SCHEMA_VERSION = len(MIGRATIONS)
 
@@ -104,6 +173,7 @@ class AuditEntry:
     request_id: int | None
     ip_hash: str | None
     detail: str
+    user_id: int | None = None
 
 
 # Interpolated into queries below (S608): constants only; every value is a bound parameter.
@@ -135,6 +205,18 @@ class CloudDB:
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+
+    @contextmanager
+    def transaction(self) -> Iterator[sqlite3.Connection]:
+        """One write transaction (BEGIN IMMEDIATE), for store.py; rolled back on any error."""
+        with self._tx() as c:
+            yield c
+
+    @contextmanager
+    def reading(self) -> Iterator[sqlite3.Connection]:
+        """The connection for reads, held under the lock."""
+        with self._lock:
+            yield self._conn
 
     @contextmanager
     def _tx(self) -> Iterator[sqlite3.Connection]:
@@ -265,30 +347,63 @@ class CloudDB:
     # Audit log and admin sessions
 
     def audit(
-        self, action: str, *, now: int, request_id: int | None = None, ip_hash: str | None = None, detail: str = ""
+        self,
+        action: str,
+        *,
+        now: int,
+        request_id: int | None = None,
+        ip_hash: str | None = None,
+        detail: str = "",
+        user_id: int | None = None,
     ) -> None:
         with self._tx() as c:
             c.execute(
-                "INSERT INTO audit_log (at, action, request_id, ip_hash, detail) VALUES (?, ?, ?, ?, ?)",
-                (now, action, request_id, ip_hash, detail[:200]),
+                "INSERT INTO audit_log (at, action, request_id, ip_hash, detail, user_id) VALUES (?, ?, ?, ?, ?, ?)",
+                (now, action, request_id, ip_hash, detail[:200], user_id),
             )
 
     def recent_audit(self, limit: int = 50) -> list[AuditEntry]:
         with self._lock:
             rows = self._conn.execute(
-                "SELECT at, action, request_id, ip_hash, detail FROM audit_log ORDER BY id DESC LIMIT ?", (limit,)
+                "SELECT at, action, request_id, ip_hash, detail, user_id FROM audit_log ORDER BY id DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [AuditEntry(*row) for row in rows]
 
-    def failed_logins_since(self, ip_hash: str, since: int) -> int:
-        """Failures from one network in the window, counted from its last successful sign-in."""
+    def failed_logins_since(self, ip_hash: str, since: int, *, prefix: str = "") -> int:
+        """Failures from one network in the window, counted from its last successful sign-in.
+
+        prefix "" counts the owner's sign-ins, "user." the members'; the two lockouts are separate.
+        """
+        failed, success = f"{prefix}login.failed", f"{prefix}login"
         with self._lock:
             row = self._conn.execute(
-                "SELECT COUNT(*) FROM audit_log WHERE ip_hash = ? AND action = 'login.failed' AND at > MAX(?, "
-                "COALESCE((SELECT MAX(at) FROM audit_log WHERE ip_hash = ? AND action = 'login'), 0))",
-                (ip_hash, since, ip_hash),
+                "SELECT COUNT(*) FROM audit_log WHERE ip_hash = ? AND action = ? AND at > MAX(?, "
+                "COALESCE((SELECT MAX(at) FROM audit_log WHERE ip_hash = ? AND action = ?), 0))",
+                (ip_hash, failed, since, ip_hash, success),
             ).fetchone()
         return int(row[0])
+
+    def actions_since(self, action: str, since: int, *, ip_hash: str | None = None, user_id: int | None = None) -> int:
+        """How often an action happened in a window, for one network or one member (rate limits)."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT COUNT(*) FROM audit_log WHERE action = ? AND at > ? "
+                "AND (? IS NULL OR ip_hash = ?) AND (? IS NULL OR user_id = ?)",
+                (action, since, ip_hash, ip_hash, user_id, user_id),
+            ).fetchone()
+        return int(row[0])
+
+    def last_action(self, user_id: int, actions: tuple[str, ...]) -> tuple[str, int] | None:
+        """The most recent of these actions for one member, as (action, at)."""
+        marks = ", ".join("?" * len(actions))
+        with self._lock:
+            row = self._conn.execute(
+                f"SELECT action, at FROM audit_log WHERE user_id = ? AND action IN ({marks}) "  # noqa: S608
+                "ORDER BY id DESC LIMIT 1",
+                (user_id, *actions),
+            ).fetchone()
+        return (str(row[0]), int(row[1])) if row else None
 
     def revoke_session(self, sid: str, expires_at: int) -> None:
         with self._tx() as c:
@@ -311,4 +426,6 @@ class CloudDB:
                 "DELETE FROM invites WHERE used_at IS NULL AND expires_at < ?", (now - EXPIRED_INVITE_RETENTION,)
             ).rowcount
             c.execute("DELETE FROM revoked_sessions WHERE expires_at < ?", (now,))
+            c.execute("DELETE FROM user_sessions WHERE expires_at < ?", (now,))
+            c.execute("DELETE FROM password_resets WHERE expires_at < ?", (now,))
         return requests, invites
