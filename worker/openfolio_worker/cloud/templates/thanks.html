@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
-{% block title %}Thanks for your request · Openfolio Cloud{% endblock %}
+{% set noindex = true %}
+{% block title %}You're on the waitlist · Openfolio Cloud{% endblock %}
 {% block main %}
 <section class="page-center">
   <div class="card notice">
     <span class="notice-icon notice-ok">{{ icon("check", 28) }}</span>
-    <h1>Thanks, we've got your request.</h1>
+    <h1>You're on the waitlist.</h1>
     <p class="lead-sm">We read every request ourselves. If you're approved, you'll get an email with a personal invite link.</p>
-    <p class="muted">Nothing else to do for now. You can close this page.</p>
+    <p class="muted">Joining during the beta makes you a founding member, with free monthly credits once you're in. Nothing else to do for now.</p>
     <div class="notice-actions">
       <a class="btn btn-primary" href="/">Back to the home page</a>
       <a class="btn btn-ghost" href="/privacy">How we use your details</a>

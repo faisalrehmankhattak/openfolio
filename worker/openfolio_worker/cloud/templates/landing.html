@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% from "_icons.html" import icon %}
-{% block title %}Openfolio Cloud: your portfolio, alive{% endblock %}
+{# The form posts to /cloud/requests and re-renders here on errors; the canonical page is always /. #}
+{% set canonical_path = "/" %}
+{% set jsonld = seo.landing_jsonld() %}
+{% block title %}Openfolio: AI portfolio builder that talks to recruiters{% endblock %}
+{% block description %}A modern portfolio for everyone: a 3D AI version of you that talks to recruiters by voice or chat and answers only from what you wrote. Open source. Join the waitlist.{% endblock %}
 {% block body_class %}landing{% endblock %}
 {% block head %}
 {% if turnstile_site_key %}<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>{% endif %}
@@ -12,16 +16,18 @@
 {% macro invalid(name) %}{% if errors.get(name) %} aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}{% endmacro %}
 
 {% block main %}
-<section class="hero">
+{% set stars = seo.stars() %}
+<section class="hero" aria-labelledby="hero-title">
   <div class="wrap hero-grid">
     <div class="hero-copy">
-      <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Invite-only beta</p>
-      <h1 class="hero-title">Your portfolio, <span class="accent-text">alive.</span></h1>
-      <p class="lead">A 3D AI version of you that talks to recruiters by voice or chat, any time, and answers only from what you wrote.</p>
+      <p class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>Invite-only beta · Open source</p>
+      <h1 id="hero-title" class="hero-title">Your portfolio, <span class="accent-text">alive.</span></h1>
+      <p class="lead">A modern portfolio for everyone: a 3D AI version of you that talks to recruiters by voice or chat, any time, and answers only from what you wrote.</p>
       <div class="cta-row">
-        <a class="btn btn-primary btn-large" href="#request">Request access {{ icon("arrow", 18) }}</a>
+        <a class="btn btn-primary btn-large" href="#request">Join the waitlist {{ icon("arrow", 18) }}</a>
         {% if demo %}<button class="btn btn-ghost btn-large" type="button" data-demo="voice">{{ icon("mic", 18) }} Talk to the demo</button>{% endif %}
       </div>
+      <p class="cta-note">Free during the beta. Founding members get monthly credits.</p>
       <ul class="hero-points" aria-label="Highlights">
         <li>{{ icon("check", 16) }} Always labelled AI</li>
         <li>{{ icon("check", 16) }} Your words only</li>
@@ -65,34 +71,109 @@
     </div>
     {% endif %}
   </div>
+  <div class="wrap">
+    <p class="built-on">Built on open source: Pipecat, TalkingHead, three.js and FastAPI</p>
+  </div>
+</section>
+
+<section class="section section-tight" id="for" aria-labelledby="for-title">
+  <div class="wrap">
+    <div class="section-head section-head-center">
+      <p class="kicker">Who it's for</p>
+      <h2 id="for-title" class="section-title">For anyone whose work deserves a conversation</h2>
+      <p class="section-lead">A résumé gets skimmed. A portfolio gets a few minutes. Your AI twin gets questions answered while you sleep.</p>
+    </div>
+    <ul class="audience">
+      <li class="aud">
+        <span class="aud-icon">{{ icon("cap", 22) }}</span>
+        <h3>Students and new grads</h3>
+        <p>Stand out for internships and first jobs. Let recruiters hear how you think, not just what you list.</p>
+      </li>
+      <li class="aud">
+        <span class="aud-icon">{{ icon("code", 22) }}</span>
+        <h3>Engineers</h3>
+        <p>Walk hiring managers through your systems, trade-offs and results, in your own words.</p>
+      </li>
+      <li class="aud">
+        <span class="aud-icon">{{ icon("pen", 22) }}</span>
+        <h3>Designers</h3>
+        <p>Give every case study a guide who can explain the why behind each decision.</p>
+      </li>
+      <li class="aud">
+        <span class="aud-icon">{{ icon("briefcase", 22) }}</span>
+        <h3>Freelancers</h3>
+        <p>Answer client questions about scope, process and past work while you're busy delivering.</p>
+      </li>
+      <li class="aud">
+        <span class="aud-icon">{{ icon("route", 22) }}</span>
+        <h3>Career switchers</h3>
+        <p>Connect the dots between the roles you've had and the job you want next.</p>
+      </li>
+    </ul>
+  </div>
+</section>
+
+<section class="section section-tint" id="recruiters" aria-labelledby="recruiters-title">
+  <div class="wrap split">
+    <div class="split-copy">
+      <p class="kicker">For recruiters</p>
+      <h2 id="recruiters-title" class="section-title">Interview the AI twin, any time</h2>
+      <p class="section-lead">Skip the scheduling for first questions. Ask about projects, experience and skills by voice or chat, and get answers in the candidate's own words.</p>
+      <ul class="feature-list">
+        <li>{{ icon("clock", 20) }}<div><h3>Any hour, any time zone</h3><p>Screen a candidate at 11 p.m. or between meetings. No calendar invites.</p></div></li>
+        <li>{{ icon("book", 20) }}<div><h3>Grounded in what they wrote</h3><p>Every answer comes from the candidate's own profile, which they reviewed.</p></div></li>
+        <li>{{ icon("alert", 20) }}<div><h3>Honest about its limits</h3><p>If it isn't covered, it says so instead of guessing.</p></div></li>
+        <li>{{ icon("mail", 20) }}<div><h3>A direct line to the real person</h3><p>Leave a message and the candidate gets it, with your name and email.</p></div></li>
+      </ul>
+      {% if demo %}<button class="btn btn-primary" type="button" data-demo="chat">{{ icon("chat", 18) }} Interview {{ demo.first_name }}'s AI twin</button>{% endif %}
+    </div>
+    <figure class="transcript" aria-labelledby="transcript-caption">
+      <figcaption id="transcript-caption" class="transcript-head">
+        <span class="transcript-avatar" aria-hidden="true">M<span class="ai-tag">AI</span></span>
+        <span><strong>Maya's AI twin</strong><span class="transcript-sub">Product designer · example conversation</span></span>
+      </figcaption>
+      <div class="transcript-body">
+        <p class="bubble bubble-user"><span class="sr-only">Recruiter: </span>Walk me through a project you're proud of.</p>
+        <p class="bubble bubble-bot"><span class="sr-only">AI twin: </span>Happy to. I'm an AI version of Maya. Her favourite is the design system she built for a small fintech team: one set of components for web and mobile. Want the problem it solved, or how she ran it?</p>
+        <p class="bubble bubble-user"><span class="sr-only">Recruiter: </span>Is she open to relocating to Berlin?</p>
+        <p class="bubble bubble-bot"><span class="sr-only">AI twin: </span>That isn't in what Maya shared with me, so I won't guess. Would you like to leave her a message? The real Maya will reply.</p>
+      </div>
+      <p class="transcript-foot">{{ icon("tag", 16) }} Labelled AI from the first message</p>
+    </figure>
+  </div>
 </section>
 
 <section class="section" id="how" aria-labelledby="how-title">
   <div class="wrap">
     <div class="section-head">
       <p class="kicker">How it works</p>
-      <h2 id="how-title" class="section-title">From request to a portfolio that talks back</h2>
+      <h2 id="how-title" class="section-title">From résumé to a portfolio that talks back</h2>
+      <p class="section-lead">Start from what you already have. You stay in control of every word.</p>
     </div>
     <ol class="steps">
       <li class="step">
-        <span class="step-num" aria-hidden="true">1</span>
-        <h3>Request access</h3>
-        <p>Tell us who you are and where your portfolio lives. It takes a minute.</p>
+        <span class="step-icon" aria-hidden="true">{{ icon("upload", 22) }}</span>
+        <p class="step-num">Step 1</p>
+        <h3>Upload your résumé and photo</h3>
+        <p>A PDF résumé and one good photo are enough to begin.</p>
       </li>
       <li class="step">
-        <span class="step-num" aria-hidden="true">2</span>
-        <h3>Get approved</h3>
-        <p>We read every request by hand and email you a private invite link.</p>
+        <span class="step-icon" aria-hidden="true">{{ icon("sparkle", 22) }}</span>
+        <p class="step-num">Step 2</p>
+        <h3>Your AI drafts itself</h3>
+        <p>Openfolio turns your résumé into a first draft: projects, experience, skills and suggested questions.</p>
       </li>
       <li class="step">
-        <span class="step-num" aria-hidden="true">3</span>
-        <h3>Add your story and avatar</h3>
-        <p>Write what your AI may say: projects, experience and your own rules. Add a photo and pick a 3D avatar.</p>
+        <span class="step-icon" aria-hidden="true">{{ icon("eye", 22) }}</span>
+        <p class="step-num">Step 3</p>
+        <h3>Review every word</h3>
+        <p>Edit the facts, add your own rules such as "never discuss salary" and choose your 3D avatar. Nothing goes live until you approve it.</p>
       </li>
       <li class="step">
-        <span class="step-num" aria-hidden="true">4</span>
-        <h3>Paste one line</h3>
-        <p>One script tag on your site, and visitors can talk to you.</p>
+        <span class="step-icon" aria-hidden="true">{{ icon("share", 22) }}</span>
+        <p class="step-num">Step 4</p>
+        <h3>Share a link or paste one line</h3>
+        <p>Send your link to recruiters, or add one script tag to your own site.</p>
         <code class="snippet">&lt;script src="…/embed.js" data-persona="you" async&gt;&lt;/script&gt;</code>
       </li>
     </ol>
@@ -131,16 +212,93 @@
   </div>
 </section>
 
+<section class="section section-ink" id="open-source" aria-labelledby="oss-title">
+  <div class="wrap split">
+    <div class="split-copy">
+      <p class="kicker">Open source</p>
+      <h2 id="oss-title" class="section-title">Built in the open</h2>
+      <p class="section-lead">Openfolio is open source under Apache-2.0. Read every line, run it on your own server, or let us host it for you.</p>
+      <ul class="oss-points">
+        <li>{{ icon("server", 20) }}<span><strong>No GPU needed.</strong> The 3D face renders in the visitor's browser.</span></li>
+        <li>{{ icon("plug", 20) }}<span><strong>Any AI provider.</strong> OpenAI-compatible models, Deepgram or local Whisper, Kokoro or ElevenLabs.</span></li>
+        <li>{{ icon("lock", 20) }}<span><strong>Nothing from other origins.</strong> The widget talks only to your server.</span></li>
+      </ul>
+      <div class="cta-row">
+        <a class="btn btn-light" href="{{ github_url }}" rel="noopener">{{ icon("github", 18) }} Star on GitHub{% if stars %}<span class="btn-count" aria-label="{{ stars }} stars">{{ stars }}</span>{% endif %}</a>
+        <a class="btn btn-outline-light" href="{{ github_url }}/blob/main/CONTRIBUTING.md" rel="noopener">Contribute and earn credits</a>
+      </div>
+    </div>
+    <div class="terminal" role="img" aria-label="Three commands to run Openfolio yourself: clone the repository, copy the example settings, and start it with Docker Compose.">
+      <div class="terminal-bar" aria-hidden="true"><span></span><span></span><span></span><em>Run it yourself</em></div>
+      <pre aria-hidden="true"><code><span class="t-dim">$</span> git clone {{ github_url }}
+<span class="t-dim">$</span> cd openfolio &amp;&amp; cp .env.example .env
+<span class="t-dim">$</span> docker compose up --build
+<span class="t-ok">✓ Openfolio is running on http://localhost:7860</span></code></pre>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="founding" aria-labelledby="founding-title">
+  <div class="wrap">
+    <div class="section-head section-head-center">
+      <p class="kicker">Founding members</p>
+      <h2 id="founding-title" class="section-title">Early supporters get more</h2>
+      <p class="section-lead">We reward people who join early and people who help build Openfolio.</p>
+    </div>
+    <ul class="tiers">
+      <li class="tier tier-feature">
+        <span class="tier-icon">{{ icon("gift", 22) }}</span>
+        <p class="tier-label">Join the waitlist during the beta</p>
+        <h3>Free monthly credits</h3>
+        <p>Everyone who joins the waitlist during the beta becomes a founding member, with free Openfolio Cloud credits every month.</p>
+        <a class="btn btn-primary btn-small" href="#request">Join the waitlist</a>
+      </li>
+      <li class="tier">
+        <span class="tier-icon">{{ icon("merge", 22) }}</span>
+        <p class="tier-label">Get a pull request merged</p>
+        <h3>Extra credits</h3>
+        <p>Code, tests, docs or translations: when your pull request is merged, you earn extra Cloud credits on top.</p>
+        <a class="text-link" href="{{ github_url }}/blob/main/CONTRIBUTING.md" rel="noopener">How to contribute {{ icon("arrow", 16) }}</a>
+      </li>
+      <li class="tier tier-quiet">
+        <span class="tier-icon">{{ icon("ban", 22) }}</span>
+        <p class="tier-label">What we never reward</p>
+        <h3>Stars, upvotes or follows</h3>
+        <p>Star the repo if you like it. We only reward real work, so a star never earns credits or perks.</p>
+      </li>
+    </ul>
+    <p class="fine center tiers-note">Credits pay for your AI's conversations on Openfolio Cloud and have no cash value. We'll email the amounts before they apply.</p>
+  </div>
+</section>
+
+<section class="section section-tint" id="faq" aria-labelledby="faq-title">
+  <div class="wrap faq-grid">
+    <div class="section-head">
+      <p class="kicker">FAQ</p>
+      <h2 id="faq-title" class="section-title">Questions, answered</h2>
+      <p class="section-lead">Still curious? Ask the demo, or read the <a href="/guides/ai-portfolio">guide to AI portfolios</a>.</p>
+    </div>
+    <div class="faq">
+      {% for item in seo.faq %}
+      <details class="faq-item"{% if loop.first %} open{% endif %}>
+        <summary><h3>{{ item.question }}</h3><span class="faq-toggle" aria-hidden="true">{{ icon("plus", 18) }}</span></summary>
+        <p>{{ item.answer }}</p>
+      </details>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
 <section class="section" id="request" aria-labelledby="request-title">
   <div class="wrap request-grid">
     <div class="request-copy">
       <p class="kicker">Join the beta</p>
-      <h2 id="request-title" class="section-title">Request access</h2>
-      <p class="section-lead">We're letting people in a few at a time, so everyone gets a good start. Tell us a little about you.</p>
+      <h2 id="request-title" class="section-title">Join the waitlist</h2>
+      <p class="section-lead">We're letting people in a few at a time, so everyone gets a good start. Join now to become a founding member.</p>
       <ol class="next-steps">
-        <li><span class="next-num" aria-hidden="true">1</span><span>We read your request ourselves.</span></li>
+        <li><span class="next-num" aria-hidden="true">1</span><span>We read every request ourselves.</span></li>
         <li><span class="next-num" aria-hidden="true">2</span><span>If it's a fit, you get a personal invite link by email.</span></li>
-        <li><span class="next-num" aria-hidden="true">3</span><span>When the Studio opens, you build your AI version.</span></li>
+        <li><span class="next-num" aria-hidden="true">3</span><span>You build your AI version and share it.</span></li>
       </ol>
       <p class="fine">{{ icon("lock", 16) }} We keep only what you send here and a hashed network address. <a href="/privacy">Privacy notice</a></p>
     </div>
@@ -193,7 +351,7 @@
 
       {% if turnstile_site_key %}<div class="cf-turnstile" data-sitekey="{{ turnstile_site_key }}" data-theme="auto"></div>{% endif %}
 
-      <button class="btn btn-primary btn-large btn-block" type="submit">Request access</button>
+      <button class="btn btn-primary btn-large btn-block" type="submit">Join the waitlist</button>
       <p class="fine center">We'll only email you about your access.</p>
     </form>
   </div>

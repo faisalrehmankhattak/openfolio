@@ -1,0 +1,16 @@
+# Openfolio Cloud. Public pages are open to search engines and AI assistants.
+# Private pages (admin, studio, sign-in, invites, forms, API) are not.
+# Allow lines for assets come first and "Allow: /" last, so first-match parsers agree with Google's longest-match rule.
+{% for agent in ("*",) + crawlers %}
+
+User-agent: {{ agent }}
+{% for path in assets %}
+Allow: {{ path }}
+{% endfor %}
+{% for path in private %}
+Disallow: {{ path }}
+{% endfor %}
+Allow: /
+{% endfor %}
+
+Sitemap: {{ public_url }}/sitemap.xml

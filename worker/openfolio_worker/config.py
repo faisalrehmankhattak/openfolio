@@ -29,6 +29,7 @@ TTS_PROVIDERS = ("kokoro", "elevenlabs")
 TURN_PROVIDERS = ("coturn", "cloudflare")
 MIN_SESSION_SECRET = 32
 LOCAL_HOSTS = ("localhost", "127.0.0.1")
+DEFAULT_GITHUB_REPO = "faisalrehmankhattak/openfolio"
 
 
 class ConfigError(ValueError):
@@ -99,11 +100,17 @@ class CloudSettings:
     turnstile_site_key: str | None = None
     turnstile_secret_key: str | None = field(default=None, repr=False)
     smtp: SmtpSettings | None = None
+    product_hunt_url: str | None = None  # set on launch day to show the Product Hunt banner
+    github_repo: str | None = None  # "owner/name"; set to show the live star count
 
     @property
     def secure(self) -> bool:
         """Cookies get the Secure flag whenever the public site is served over HTTPS."""
         return self.public_url.startswith("https://")
+
+    @property
+    def github_url(self) -> str:
+        return f"https://github.com/{self.github_repo or DEFAULT_GITHUB_REPO}"
 
 
 def _public_url() -> str:
@@ -117,6 +124,24 @@ def _public_url() -> str:
     if parts.path not in ("", "/") or parts.query or parts.fragment or parts.username or parts.password:
         raise ConfigError(f"PUBLIC_URL must be a bare origin such as https://example.com, got {raw!r}")
     return f"{parts.scheme}://{parts.netloc}"
+
+
+def _product_hunt_url() -> str | None:
+    raw = _str("PRODUCT_HUNT_URL")
+    if not raw:
+        return None
+    parts = urlsplit(raw)
+    host = parts.hostname or ""
+    if parts.scheme != "https" or not (host == "producthunt.com" or host.endswith(".producthunt.com")):
+        raise ConfigError(f"PRODUCT_HUNT_URL must be an https://www.producthunt.com/ link, got {raw!r}")
+    return raw
+
+
+def _github_repo() -> str | None:
+    raw = _str("GITHUB_REPO")
+    if raw and not re.fullmatch(r"[A-Za-z0-9-]{1,39}/[A-Za-z0-9._-]{1,100}", raw):
+        raise ConfigError(f"GITHUB_REPO must look like owner/name, got {raw!r}")
+    return raw
 
 
 def _smtp() -> SmtpSettings | None:
@@ -170,6 +195,8 @@ def _cloud_settings() -> CloudSettings | None:
         turnstile_site_key=site_key,
         turnstile_secret_key=secret_key,
         smtp=_smtp(),
+        product_hunt_url=_product_hunt_url(),
+        github_repo=_github_repo(),
     )
 
 

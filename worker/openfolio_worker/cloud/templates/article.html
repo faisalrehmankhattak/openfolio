@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{# Layout for the guides: answer first, then detail, so people and AI assistants can quote the top. #}
+{% block og_type %}article{% endblock %}
+{% block title %}{{ article.title }}{% endblock %}
+{% block description %}{{ article.description }}{% endblock %}
+{% block body_class %}guide-page{% endblock %}
+{% block main %}
+<article class="guide" aria-labelledby="guide-title">
+  <header class="guide-hero">
+    <div class="wrap-guide">
+      <nav class="crumbs" aria-label="Breadcrumb">
+        <ol>
+          <li><a href="/">Openfolio</a></li>
+          <li><span aria-current="page">{{ article.crumb }}</span></li>
+        </ol>
+      </nav>
+      <p class="kicker">{% block kicker %}Guide{% endblock %}</p>
+      <h1 id="guide-title">{{ article.headline }}</h1>
+      <p class="guide-lead">{% block lead %}{% endblock %}</p>
+      <p class="guide-meta">By Faisal Rehman, maker of Openfolio · Updated <time datetime="{{ seo.content_date }}">24 October 2026</time></p>
+    </div>
+  </header>
+  <div class="wrap-guide guide-body">
+    <section class="answer" aria-labelledby="answer-title">
+      <h2 id="answer-title" class="answer-label">Short answer</h2>
+      {% block answer %}{% endblock %}
+    </section>
+    {% block body %}{% endblock %}
+    <aside class="guide-cta" aria-labelledby="guide-cta-title">
+      <h2 id="guide-cta-title">Make your portfolio talk back</h2>
+      <p>Openfolio gives you a 3D AI version of you that answers recruiters by voice or chat, only from what you wrote. Free during the beta.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/#request">Join the waitlist {{ icon("arrow", 18) }}</a>
+        <a class="btn btn-ghost" href="/">Try the live demo</a>
+      </div>
+    </aside>
+    <nav class="guide-more" aria-labelledby="more-title">
+      <h2 id="more-title">Keep reading</h2>
+      <ul>
+        {% for other in seo.articles if other.path != article.path %}
+        <li><a href="{{ other.path }}"><strong>{{ other.headline }}</strong><span>{{ other.description }}</span></a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </div>
+</article>
+{% endblock %}

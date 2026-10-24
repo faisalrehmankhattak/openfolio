@@ -1,0 +1,27 @@
+# Openfolio
+
+> {{ summary }} Openfolio Cloud is the hosted version, in an invite-only beta with a waitlist. The software is open source under the Apache-2.0 license.
+
+Openfolio is an AI portfolio builder for students, engineers, designers, freelancers and career switchers. Visitors, usually recruiters, talk to a 3D avatar of the owner by voice or text. The avatar is always labelled as AI, answers only from a profile the owner writes and approves, and says when it doesn't know. It embeds on any website with one script tag.
+
+## Product
+
+- [Openfolio Cloud]({{ public_url }}/): Landing page with a live demo you can talk to, the FAQ and the waitlist
+- [Full product facts]({{ public_url }}/llms-full.txt): Features, pricing, safety, technology and limits on one plain-text page
+
+## Guides
+
+{% for a in articles %}
+- [{{ a.headline }}]({{ public_url }}{{ a.path }}): {{ a.description }}
+{% endfor %}
+
+## Open source
+
+- [Source code on GitHub]({{ github_url }}): The Openfolio voice server (Python, FastAPI, Pipecat) and embeddable widget (TypeScript, three.js), Apache-2.0
+- [Self-hosting]({{ github_url }}#quick-start): Run Openfolio with Docker on a CPU-only server with your own AI providers
+- [Contributing]({{ github_url }}/blob/main/CONTRIBUTING.md): How to contribute; merged pull requests earn Openfolio Cloud credits
+
+## Optional
+
+- [Privacy notice]({{ public_url }}/privacy): What Openfolio Cloud stores and for how long
+- [Terms of use]({{ public_url }}/terms): Terms for the hosted beta

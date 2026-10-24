@@ -1,33 +1,69 @@
-{% from "_icons.html" import mark %}
+{% from "_icons.html" import icon, mark %}
+{#- Child templates may set at top level: noindex (private pages), canonical_path (when the URL differs from the page). -#}
+{% set page_noindex = noindex is defined and noindex %}
+{% set canonical = public_url ~ (canonical_path if canonical_path is defined else path) %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Openfolio Cloud{% endblock %}</title>
-  <meta name="description" content="{% block description %}A 3D AI version of you that talks to recruiters by voice or chat, answering only from what you wrote. Invite-only beta.{% endblock %}">
-  {% if noindex is defined and noindex %}<meta name="robots" content="noindex, nofollow">{% endif %}
+  <meta name="description" content="{% block description %}Openfolio is an AI portfolio builder: a 3D AI version of you that talks to recruiters by voice or chat, answering only from what you wrote.{% endblock %}">
+  {% if page_noindex %}
+  <meta name="robots" content="noindex, nofollow">
+  {% else %}
+  <link rel="canonical" href="{{ canonical }}">
+  {% endif %}
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0e1318" media="(prefers-color-scheme: dark)">
-  <meta property="og:title" content="Openfolio Cloud: your portfolio, alive">
-  <meta property="og:description" content="A 3D AI version of you that talks to recruiters by voice or chat. Invite-only beta.">
-  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Openfolio">
+  <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+  <meta property="og:title" content="{{ self.title() }}">
+  <meta property="og:description" content="{{ self.description() }}">
+  <meta property="og:url" content="{{ canonical }}">
+  <meta property="og:image" content="{{ public_url }}/cloud/static/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Openfolio: your portfolio, alive. A 3D AI version of you that talks to recruiters.">
+  <meta property="og:locale" content="en_US">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ self.title() }}">
+  <meta name="twitter:description" content="{{ self.description() }}">
+  <meta name="twitter:image" content="{{ public_url }}/cloud/static/og-image.png">
+  <meta name="twitter:image:alt" content="Openfolio: your portfolio, alive. A 3D AI version of you that talks to recruiters.">
   <link rel="icon" href="/cloud/static/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/cloud/static/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/cloud/static/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
   <link rel="stylesheet" href="/cloud/static/cloud.css?v={{ asset_version }}">
   <script src="/cloud/static/cloud.js?v={{ asset_version }}" defer></script>
+  {% if jsonld is defined and jsonld %}
+  <script type="application/ld+json">{{ jsonld|tojson }}</script>
+  {% endif %}
   {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
   <a class="skip" href="#main">Skip to content</a>
   {% block header %}
+  {% if product_hunt_url and not page_noindex %}
+  <a class="ph-banner" href="{{ product_hunt_url }}" rel="noopener">
+    <span class="ph-badge" aria-hidden="true">P</span>
+    <span class="ph-text">We're live on Product Hunt — come say hi and share feedback</span>
+    <span class="ph-cta" aria-hidden="true">{{ icon("arrow", 16) }}</span>
+  </a>
+  {% endif %}
   <header class="site-header">
     <div class="wrap header-row">
-      <a class="brand" href="/" aria-label="Openfolio Cloud, home">{{ mark(28) }}<span class="brand-name">Openfolio</span><span class="brand-tag">Cloud</span></a>
+      <a class="brand" href="/" aria-label="Openfolio, home">{{ mark(30, "head") }}<span class="brand-name">Openfolio</span></a>
       <nav class="nav" aria-label="Main">
         <a class="nav-link" href="/#how">How it works</a>
-        <a class="nav-link" href="/#safety">Safety</a>
-        <a class="btn btn-primary btn-small" href="/#request">Request access</a>
+        <a class="nav-link" href="/#recruiters">For recruiters</a>
+        <a class="nav-link" href="/#open-source">Open source</a>
+        <a class="nav-link" href="/#faq">FAQ</a>
+        {% set stars = seo.stars() %}
+        <a class="gh-link" href="{{ github_url }}" rel="noopener">{{ icon("github", 18) }}<span class="gh-label">GitHub</span>{% if stars %}<span class="gh-count" aria-label="{{ stars }} stars">{{ icon("star", 13) }}{{ stars }}</span>{% endif %}</a>
+        <a class="btn btn-primary btn-small" href="/#request">Join the waitlist</a>
       </nav>
     </div>
   </header>
@@ -37,17 +73,51 @@
   </main>
   {% block footer %}
   <footer class="site-footer">
-    <div class="wrap footer-row">
+    <div class="wrap footer-grid">
       <div class="footer-brand">
-        <a class="brand brand-quiet" href="/">{{ mark(24) }}<span class="brand-name">Openfolio</span><span class="brand-tag">Cloud</span></a>
-        <p class="footer-note">Invite-only beta. Openfolio is open source under Apache-2.0; you can also run it yourself.</p>
+        <a class="brand brand-quiet" href="/">{{ mark(26, "foot") }}<span class="brand-name">Openfolio</span></a>
+        <p class="footer-note">Your portfolio, alive. An open-source AI portfolio builder: a 3D AI version of you that talks to recruiters by voice or chat.</p>
+        <p class="footer-fine">Invite-only beta · Open source under <span class="nowrap">Apache-2.0</span></p>
       </div>
-      <nav class="footer-nav" aria-label="Footer">
-        <a href="/privacy">Privacy</a>
-        <a href="/terms">Terms</a>
-        <a href="{{ github_url }}" rel="noopener">GitHub</a>
-        {% if contact_email %}<a href="mailto:{{ contact_email }}">Contact</a>{% endif %}
+      <nav class="footer-col" aria-label="Product">
+        <h2 class="footer-title">Product</h2>
+        <ul>
+          <li><a href="/#how">How it works</a></li>
+          <li><a href="/#recruiters">For recruiters</a></li>
+          <li><a href="/#founding">Founding members</a></li>
+          <li><a href="/#faq">FAQ</a></li>
+          <li><a href="/#request">Join the waitlist</a></li>
+        </ul>
       </nav>
+      <nav class="footer-col" aria-label="Guides">
+        <h2 class="footer-title">Guides</h2>
+        <ul>
+          <li><a href="/guides/ai-portfolio">What is an AI portfolio?</a></li>
+          <li><a href="/guides/portfolio-for-recruiters">A portfolio recruiters can interview</a></li>
+          <li><a href="/compare">AI portfolio vs static site vs chatbot</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="Open source">
+        <h2 class="footer-title">Open source</h2>
+        <ul>
+          <li><a href="{{ github_url }}" rel="noopener">Source code</a></li>
+          <li><a href="{{ github_url }}/blob/main/CONTRIBUTING.md" rel="noopener">Contribute and earn credits</a></li>
+          <li><a href="{{ github_url }}#quick-start" rel="noopener">Run it yourself</a></li>
+          <li><a href="{{ github_url }}/blob/main/SECURITY.md" rel="noopener">Report a vulnerability</a></li>
+        </ul>
+      </nav>
+      <nav class="footer-col" aria-label="Legal">
+        <h2 class="footer-title">Legal</h2>
+        <ul>
+          <li><a href="/privacy">Privacy</a></li>
+          <li><a href="/terms">Terms</a></li>
+          {% if contact_email %}<li><a href="mailto:{{ contact_email }}">Contact</a></li>{% endif %}
+        </ul>
+      </nav>
+    </div>
+    <div class="wrap footer-bottom">
+      <p>© {{ (now|iso)[:4] }} Openfolio · Made by Faisal Rehman</p>
+      <p>No cookies or trackers for visitors.</p>
     </div>
   </footer>
   {% endblock %}
