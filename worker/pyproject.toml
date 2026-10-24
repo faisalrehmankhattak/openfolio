@@ -1,13 +1,14 @@
 [project]
 name = "openfolio-worker"
 version = "0.2.0"
-description = "Self-hosted voice server for Openfolio: an embeddable 3D talking AI avatar for portfolio websites."
+description = "Openfolio, the open-source AI portfolio builder: a 3D AI version of you that talks to recruiters by voice or chat."
 license = "Apache-2.0"
 authors = [{ name = "Faisal Rehman" }]
 requires-python = ">=3.11,<3.14"
 keywords = [
-  "ai-avatar", "talking-head", "voice-agent", "digital-twin", "portfolio",
-  "pipecat", "webrtc", "llm", "conversational-ai", "3d-avatar",
+  "ai-portfolio", "ai-portfolio-builder", "portfolio-builder", "personal-portfolio", "portfolio-website",
+  "ai-twin", "digital-twin", "ai-avatar", "3d-avatar", "talking-head", "voice-agent", "recruiting",
+  "conversational-ai", "llm", "pipecat", "webrtc", "self-hosted", "open-source",
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -30,6 +31,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/faisalrehmankhattak/openfolio"
+Repository = "https://github.com/faisalrehmankhattak/openfolio"
 Issues = "https://github.com/faisalrehmankhattak/openfolio/issues"
 
 [project.optional-dependencies]

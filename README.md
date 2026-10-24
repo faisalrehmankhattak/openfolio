@@ -1,25 +1,43 @@
 <div align="center">
 
-# Openfolio
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="worker/openfolio_worker/cloud/static/wordmark-white.svg">
+  <img src="worker/openfolio_worker/cloud/static/wordmark.svg" alt="Openfolio" height="56">
+</picture>
 
-**Your portfolio, alive.** Visitors talk face to face with a 3D AI version of you, by voice or text, from one line of HTML.
+### The open-source AI portfolio builder: a 3D AI version of you that talks to recruiters by voice or chat.
 
 [![CI](https://github.com/faisalrehmankhattak/openfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/faisalrehmankhattak/openfolio/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
 ![Self-hosted](https://img.shields.io/badge/self--hosted-no%20GPU-0b6a50)
+[![PRs welcome: earn Cloud credits](https://img.shields.io/badge/PRs%20welcome-earn%20Cloud%20credits-128a6a)](CONTRIBUTING.md)
 
-<img src=".github/assets/panel.png" alt="Openfolio widget: a 3D avatar answering questions about the owner's work" width="360">
-<img src=".github/assets/chat.png" alt="Chat mode with a project card" width="360">
+**[Try it on Openfolio Cloud](https://YOUR-OPENFOLIO-CLOUD-URL)** · [Run it yourself](#quick-start) · [Contribute and earn credits](#contribute-and-earn-credits)
+
+<img src=".github/assets/cloud-landing.png" alt="Openfolio Cloud: 'Your portfolio, alive.' with a live AI version of Faisal you can talk to or chat with" width="820">
 
 </div>
+
+**Your portfolio, alive.** Openfolio is a modern portfolio for everyone: recruiters and visitors talk face to face with a 3D AI version of you, by voice or text, and it answers only from what you wrote. Add it to any site with one line of HTML, or share a link.
 
 ```html
 <script src="https://YOUR-SERVER/embed/embed.js" data-persona="you" async></script>
 ```
 
-Openfolio is an open-source **AI avatar widget for portfolio websites**: a talking 3D head that answers recruiters' and visitors' questions about your work, in your words, by voice or chat. It is a self-hosted alternative to closed "AI digital twin" services. The face renders in the visitor's browser, so **the server needs no GPU** and you pay only for speech-to-text, the LLM and the voice (or nothing, with local models).
+It is an open-source **AI avatar widget for portfolio websites** and a self-hosted alternative to closed "AI digital twin" services. The face renders in the visitor's browser, so **the server needs no GPU** and you pay only for speech-to-text, the LLM and the voice (or nothing, with local models). **Openfolio Cloud** is the hosted version, in an invite-only beta.
+
+> Openfolio is not related to an earlier investing app that used the same name.
+
+<p align="center">
+<img src=".github/assets/panel.png" alt="Openfolio widget: a 3D avatar answering questions about the owner's work" width="300">
+<img src=".github/assets/chat.png" alt="Chat mode with a project card" width="300">
+</p>
+
+## Who it's for
+
+Students and new grads, engineers, designers, freelancers and career switchers: anyone whose portfolio decides whether someone gets in touch. **Recruiters** can interview the AI twin at any time, and leave a message for the real person.
 
 ## Features
 
@@ -28,11 +46,22 @@ Openfolio is an open-source **AI avatar widget for portfolio websites**: a talki
 - **Real-time voice.** WebRTC with interruptions, live captions and lip-sync driven by the audio itself, so it works with any voice.
 - **Text first.** Typing or tapping a suggested question never asks for the microphone. Voice is one tap away.
 - **Grounded answers.** Everything the AI knows comes from one JSON file you write. It says "I don't know" instead of inventing facts.
+- **Always labelled AI.** The button, the panel and the first answer say it's an AI version of you.
 - **Portfolio cards.** Projects, experience, skills and contact links appear as cards in the chat.
 - **Leave a message.** Visitors can leave their name, email and a note; you get a JSONL inbox.
 - **Any provider.** Any OpenAI-compatible LLM (OpenAI, Groq, OpenRouter, Ollama, vLLM); Deepgram or local Whisper for speech; Kokoro (free, CPU) or ElevenLabs (your cloned voice).
-- **Guardrails built in.** Prompt-injection screening, portfolio-only scope, rate limits, origin checks and an always-visible "AI" disclosure. See [Security](#security).
+- **Guardrails built in.** Prompt-injection screening, portfolio-only scope, rate limits and origin checks. See [Security](#security).
 - **No third-party calls from the browser.** The widget only talks to your server (and your STUN/TURN servers).
+
+## Contribute and earn credits
+
+Openfolio is built in the open, and contributors get rewarded for real work:
+
+- **Merged pull requests earn Openfolio Cloud credits**, on top of the free monthly credits that founding members (everyone who joins the waitlist during the beta) receive. Code, tests, docs and translations all count.
+- Good places to start: [`good first issue`](https://github.com/faisalrehmankhattak/openfolio/labels/good%20first%20issue) labels, the prompt-injection corpus in `worker/tests/test_guard_eval.py`, and testing voice on browsers and networks we haven't covered.
+- Stars are always appreciated but never rewarded: no credits or perks for stars, follows or upvotes.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks and pull request rules, and our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Quick start
 
@@ -118,6 +147,7 @@ Browser (your site)                          Openfolio server (CPU only)
 | `worker/openfolio_worker/bot.py` | Per-visitor pipeline and provider selection |
 | `worker/openfolio_worker/persona.py` | Persona schema and system prompt |
 | `worker/openfolio_worker/guard.py` | Input cleanup, injection screen, turn limits |
+| `worker/openfolio_worker/cloud/` | Openfolio Cloud: landing page, waitlist, admin, invites; `seo.py` for search engines and AI assistants |
 
 ## Security
 
@@ -138,7 +168,7 @@ Browser (your site)                          Openfolio server (CPU only)
 
 The injection screen is a regular expression, not a classifier, and the system prompt is the second layer. The labelled corpus in `worker/tests/test_guard_eval.py` measures both missed attacks and false alarms; add any miss you see in your logs.
 
-Found a vulnerability? Please report it privately through [GitHub security advisories](https://github.com/faisalrehmankhattak/openfolio/security/advisories/new) rather than a public issue.
+Found a vulnerability? Please report it privately as described in [SECURITY.md](SECURITY.md) (email or [GitHub security advisories](https://github.com/faisalrehmankhattak/openfolio/security/advisories/new)), not in a public issue.
 
 ## Configuration
 
@@ -182,9 +212,9 @@ docker compose -f compose.yaml -f compose.host.yaml up --build -d
 
 ## Openfolio Cloud (invite-only beta)
 
-The same server can run Openfolio Cloud, the hosted, invite-only version. `CLOUD_MODE=1` turns `/` into a landing page with the live demo and a request form, and adds an owner-only admin page. Without it the server behaves as described above.
+The same server can run Openfolio Cloud, the hosted, invite-only version. `CLOUD_MODE=1` turns `/` into a landing page with the live demo and a waitlist form, and adds an owner-only admin page. Without it the server behaves as described above.
 
-1. A visitor fills in the request form: name, email, portfolio, what they do and, optionally, why. A hidden honeypot field, 3 requests per network per hour, one pending request per email and, when configured, [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) keep spam out. Every outcome shows the same thank-you page.
+1. A visitor joins the waitlist: name, email, portfolio, what they do and, optionally, why. A hidden honeypot field, 3 requests per network per hour, one pending request per email and, when configured, [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) keep spam out. Every outcome shows the same thank-you page.
 2. You get an email (optional SMTP) and review the request at `/admin`.
 3. **Approve** creates a personal, single-use invite link that expires after 7 days. Only its SHA-256 hash is stored. It is emailed when SMTP is set and always shown once with a Copy button. **Reject** revokes any open invite; **Delete** erases the request and its invites. Every action goes to an audit log on the same page.
 4. The invite link confirms the approval. Stage 2 (the Studio, where approved people build their AI version) will accept it.
@@ -199,7 +229,11 @@ Requests live in SQLite at `DATA_DIR/cloud.db`. IP addresses are stored only as 
 | `ADMIN_PASSWORD_HASH` | Your admin password as an scrypt hash: `cd worker && uv run openfolio-admin-hash` |
 | `CLOUD_DEMO_PERSONA` | Persona in the landing page demo (default `faisal`) |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Optional bot check on the form; set both |
+| `GITHUB_REPO` | Optional `owner/name`; shows the repository's live star count, fetched server-side and cached for an hour |
+| `PRODUCT_HUNT_URL` | Optional Product Hunt link; shows a "we're live" banner on public pages while set |
 | `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `NOTIFY_EMAIL` | Optional email: new requests go to `NOTIFY_EMAIL`, approvals send the invite. STARTTLS; Gmail works with `smtp.gmail.com` and an app password |
+
+For search engines and AI assistants, the cloud serves `/robots.txt` (public pages open to Googlebot, Bingbot, GPTBot, ClaudeBot, PerplexityBot and others; admin, invite and form paths closed), `/sitemap.xml`, `/llms.txt` and `/llms-full.txt` ([llmstxt.org](https://llmstxt.org) format), `/.well-known/security.txt`, JSON-LD on every public page, and three guides: `/guides/ai-portfolio`, `/guides/portfolio-for-recruiters` and `/compare`.
 
 Cloud pages send a Content Security Policy with only `'self'`, no inline scripts and `frame-ancestors 'none'`, plus `X-Frame-Options: DENY`; admin and invite pages are `no-store`. The landing page runs the live widget, so its policy also allows inline `<style>` elements (the widget styles its shadow DOM at runtime) and `blob:` fetches (the 3D head loads its textures through blob URLs), and Turnstile's origin when it is on. No `eval` is allowed anywhere.
 
@@ -237,7 +271,7 @@ Browser flows (voice with recorded speech, chat, cards, guardrails, embedding, c
 
 ## Contributing
 
-Issues and pull requests are welcome. Keep changes small, add a test for any behaviour change, and run the development checks above before opening a PR. New guard false positives or misses belong in `worker/tests/test_guard_eval.py`.
+Issues and pull requests are welcome, and merged pull requests earn Openfolio Cloud credits (see [Contribute and earn credits](#contribute-and-earn-credits)). Keep changes small, add a test for any behaviour change, and run the development checks above before opening a PR. New guard false positives or misses belong in `worker/tests/test_guard_eval.py`. Details are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
