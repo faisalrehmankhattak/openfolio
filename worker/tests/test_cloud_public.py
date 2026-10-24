@@ -9,7 +9,20 @@ from openfolio_worker.server import create_app
 
 from cloud_helpers import VALID, client_for, rows, submit
 
-CLOUD_PATHS = ["/privacy", "/terms", "/admin", "/admin/login", "/cloud/thanks", "/invite/" + "a" * 43]
+CLOUD_PATHS = [
+    "/privacy",
+    "/terms",
+    "/admin",
+    "/admin/login",
+    "/cloud/thanks",
+    "/invite/" + "a" * 43,
+    "/join/" + "a" * 43,
+    "/login",
+    "/studio",
+    "/studio/setup",
+    "/p/jane",
+    "/p/jane.md",
+]
 
 
 def test_cloud_mode_off_keeps_the_demo_and_hides_cloud_routes(settings):

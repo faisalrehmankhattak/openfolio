@@ -1,0 +1,176 @@
+{% from "_icons.html" import icon, mark %}
+{% set p = persona %}
+{% set indexable = show_in_search and not preview_note %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ p.name }}{% if p.title %} · {{ p.title }}{% endif %}</title>
+  <meta name="description" content="{{ description }}">
+  {% if not indexable %}<meta name="robots" content="noindex">{% endif %}
+  <link rel="canonical" href="{{ page_url }}">
+  <link rel="alternate" type="text/markdown" href="{{ page_url }}.md" title="Plain-text profile">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f7f8fa" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d1217" media="(prefers-color-scheme: dark)">
+  <meta property="og:type" content="profile">
+  <meta property="og:site_name" content="Openfolio">
+  <meta property="og:title" content="{{ p.name }}{% if p.title %} · {{ p.title }}{% endif %}">
+  <meta property="og:description" content="{{ description }}">
+  <meta property="og:url" content="{{ page_url }}">
+  {% if photo_abs %}<meta property="og:image" content="{{ photo_abs }}">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:image:alt" content="Photo of {{ p.name }}">{% endif %}
+  <meta property="profile:first_name" content="{{ p.first_name }}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{{ p.name }}{% if p.title %} · {{ p.title }}{% endif %}">
+  <meta name="twitter:description" content="{{ description }}">
+  {% if photo_abs %}<meta name="twitter:image" content="{{ photo_abs }}">{% endif %}
+  <link rel="icon" href="/cloud/static/favicon.svg" type="image/svg+xml">
+  {% if photo_url %}<link rel="preload" as="image" href="{{ photo_url }}">{% endif %}
+  <link rel="stylesheet" href="/cloud/static/profile.css?v={{ asset_version }}">
+  <script src="/cloud/static/cloud.js?v={{ asset_version }}" defer></script>
+  <script type="application/ld+json">{{ ld|tojson }}</script>
+</head>
+<body class="pf">
+  <a class="pf-skip" href="#main">Skip to content</a>
+  {% if preview_note %}
+  <div class="pf-preview-bar" role="note">{{ icon("eye", 16) }} <span>{{ preview_note }}</span> <a href="/admin?tab=reviews">Back to reviews</a></div>
+  {% endif %}
+  <header class="pf-top">
+    <div class="pf-wrap pf-top-row">
+      <a class="pf-handle mono" href="{{ page_url }}">/p/{{ p.id }}</a>
+      <div class="pf-top-actions">
+        <button class="pf-btn pf-btn-quiet" type="button" data-demo="chat">{{ icon("chat", 16) }}<span>Chat</span></button>
+        <button class="pf-btn pf-btn-primary" type="button" data-demo="voice">{{ icon("mic", 16) }}<span>Talk to my AI</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section class="pf-hero">
+      <div class="pf-wrap pf-hero-grid">
+        <div class="pf-hero-copy">
+          {% if p.pronouns %}<p class="pf-pronouns">{{ p.pronouns }}</p>{% endif %}
+          <h1 class="pf-name">{{ p.name }}</h1>
+          <p class="pf-title">{{ p.title }}{% if employer and employer not in p.title %} <span class="pf-at">at {{ employer }}</span>{% endif %}</p>
+          {% if p.tagline %}<p class="pf-tagline">{{ p.tagline }}</p>{% endif %}
+          <div class="pf-cta">
+            <button class="pf-btn pf-btn-primary pf-btn-lg" type="button" data-demo="voice">{{ icon("mic", 18) }}<span>Talk to my AI</span></button>
+            <button class="pf-btn pf-btn-ghost pf-btn-lg" type="button" data-demo="chat">{{ icon("chat", 18) }}<span>Chat instead</span></button>
+          </div>
+          <p class="pf-ai-note">{{ icon("sparkle", 14) }} An AI version of {{ p.first_name }} answers from this page, by voice or chat. It says it's AI.</p>
+          {% if p.links or p.email %}
+          <ul class="pf-links" aria-label="Links">
+            {% for link in p.links %}<li><a href="{{ link.url|string|safe_url }}" rel="me noopener" target="_blank">{{ link.label }} {{ icon("external", 13) }}</a></li>{% endfor %}
+            {% if p.email %}<li><a href="mailto:{{ p.email }}">{{ icon("mail", 14) }} Email</a></li>{% endif %}
+          </ul>
+          {% endif %}
+        </div>
+        <div class="pf-hero-photo">
+          {% if photo_url %}
+          <div class="pf-photo-ring"><img class="pf-photo" src="{{ photo_url }}" alt="{{ p.name }}" width="512" height="512" fetchpriority="high"></div>
+          {% else %}
+          <div class="pf-photo-ring"><span class="pf-photo pf-photo-empty" aria-hidden="true">{{ p.name[:1] }}</span></div>
+          {% endif %}
+          <span class="pf-live-chip"><span class="pf-live-dot" aria-hidden="true"></span>AI twin online</span>
+        </div>
+      </div>
+    </section>
+
+    {% if p.about or p.highlights %}
+    <section class="pf-section" aria-labelledby="about-h">
+      <div class="pf-wrap pf-two">
+        <h2 id="about-h" class="pf-h2">About</h2>
+        <div>
+          {% for para in p.about.split("\n\n") if para.strip() %}<p class="pf-about">{{ para }}</p>{% endfor %}
+          {% if p.highlights %}
+          <ul class="pf-highlights">{% for h in p.highlights %}<li>{{ icon("check", 16) }}<span>{{ h }}</span></li>{% endfor %}</ul>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if p.projects %}
+    <section class="pf-section" aria-labelledby="projects-h">
+      <div class="pf-wrap">
+        <h2 id="projects-h" class="pf-h2">Selected work</h2>
+        <div class="pf-projects">
+          {% for pr in p.projects %}
+          <article class="pf-card">
+            <p class="pf-card-meta">{{ [pr.org, pr.period]|select|join(" · ") }}</p>
+            <h3 class="pf-card-title">{% if pr.url %}<a href="{{ pr.url|string|safe_url }}" target="_blank" rel="noopener">{{ pr.name }} {{ icon("external", 14) }}</a>{% else %}{{ pr.name }}{% endif %}</h3>
+            <p class="pf-card-text">{{ pr.summary }}</p>
+            {% if pr.metric %}<p class="pf-metric">{{ icon("sparkle", 14) }} {{ pr.metric }}</p>{% endif %}
+          </article>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if p.experience %}
+    <section class="pf-section" aria-labelledby="exp-h">
+      <div class="pf-wrap pf-two">
+        <h2 id="exp-h" class="pf-h2">Experience</h2>
+        <ol class="pf-timeline">
+          {% for r in p.experience %}
+          <li>
+            <p class="pf-role">{{ r.title }} <span class="pf-company">· {{ r.company }}</span></p>
+            <p class="pf-period">{{ r.period }}</p>
+            {% if r.summary %}<p class="pf-role-text">{{ r.summary }}</p>{% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if p.skills %}
+    <section class="pf-section" aria-labelledby="skills-h">
+      <div class="pf-wrap pf-two">
+        <h2 id="skills-h" class="pf-h2">Skills</h2>
+        <div class="pf-skill-groups">
+          {% for group, items in p.skills.items() %}
+          <div class="pf-skill-group"><h3 class="pf-h3">{{ group }}</h3><ul class="pf-chips">{% for s in items %}<li>{{ s }}</li>{% endfor %}</ul></div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if p.education or p.awards %}
+    <section class="pf-section" aria-labelledby="edu-h">
+      <div class="pf-wrap pf-two">
+        <h2 id="edu-h" class="pf-h2">{{ "Education and recognition" if p.education and p.awards else ("Education" if p.education else "Recognition") }}</h2>
+        <ul class="pf-list">{% for e in p.education %}<li>{{ e }}</li>{% endfor %}{% for a in p.awards %}<li>{{ a }}</li>{% endfor %}</ul>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="pf-section pf-closing">
+      <div class="pf-wrap pf-closing-card">
+        <div>
+          <h2 class="pf-h2">Have a question for {{ p.first_name }}?</h2>
+          <p class="pf-muted">Ask the AI version now. It answers from this page and can pass on a message.</p>
+        </div>
+        <div class="pf-cta">
+          <button class="pf-btn pf-btn-primary pf-btn-lg" type="button" data-demo="voice">{{ icon("mic", 18) }}<span>Talk to my AI</span></button>
+          <button class="pf-btn pf-btn-ghost pf-btn-lg" type="button" data-demo="chat">{{ icon("chat", 18) }}<span>Chat</span></button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pf-footer">
+    <div class="pf-wrap pf-footer-row">
+      <a class="pf-made" href="/">{{ mark(20) }} <span>Made with <strong>Openfolio</strong></span></a>
+      <nav class="pf-footer-nav" aria-label="Footer"><a href="{{ page_url }}.md">Plain-text version</a><a href="/privacy">Privacy</a></nav>
+    </div>
+  </footer>
+  <script src="/embed/embed.js" data-persona="{{ widget_id }}" async></script>
+</body>
+</html>

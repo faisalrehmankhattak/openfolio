@@ -4,15 +4,16 @@ GET  /                  landing page with the live demo and the request form
 POST /cloud/requests    access request -> 303 /cloud/thanks
 GET  /cloud/thanks      the same thank-you page for every accepted (or silently dropped) request
 GET  /privacy, /terms   policies
-GET  /invite/{token}    invite check (stage 2 will consume the token when the Studio opens)
-/admin/...              the owner's pages (admin.py)
+/join, /login, ...      member accounts (accounts.py); /invite/{token} links from stage 1 redirect to /join
+/studio/...             the members' Studio (studio.py)
+/p/{handle}             live members' public pages (public_profile.py)
+/admin/...              the owner's pages (admin.py, admin_members.py)
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import re
 from collections.abc import Awaitable, Callable
 
 import httpx
@@ -25,20 +26,28 @@ from starlette.background import BackgroundTask
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from ..config import Settings
-from ..persona import Persona
-from .admin import admin_router
-from .auth import Keys, hash_token
+from ..registry import PersonaRegistry
+from .accounts import accounts_router
+from .admin import AdminAuth, admin_router
+from .admin_members import MemberAdmin
+from .auth import Keys
 from .db import DAY, CloudDB
 from .forms import FormError, read_form, validate_request, verify_turnstile
 from .mail import Mailer, new_request_email
+from .member_auth import MemberAuth
+from .members import preview_hook, refresh_live
+from .public_profile import public_router as profile_router
+from .store import StudioStore
+from .studio import Studio
+from .uploads import FileStore
 from .web import STATIC_DIR, STRICT_CSP, CloudContext
 
 REQUESTS_PER_HOUR = 3
 HONEYPOT = "website"
 PURGE_INTERVAL_SECONDS = DAY
 FORM_FIELDS = ("name", "email", "portfolio_url", "about", "reason")
-_TOKEN = re.compile(r"[A-Za-z0-9_-]{20,128}")
 _NO_STORE = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex"}
+_PRIVATE_PREFIXES = ("/admin", "/invite/", "/join/", "/login", "/logout", "/studio")
 # API and asset paths keep their JSON errors; people get a page.
 _API_PREFIXES = ("/v1/", "/embed/", "/avatars/", "/cloud/static/", "/livez", "/healthz")
 
@@ -139,18 +148,6 @@ def public_router(ctx: CloudContext) -> APIRouter:
     async def terms(request: Request) -> Response:
         return ctx.render(request, "terms.html")
 
-    @router.get("/invite/{token}")
-    async def invite(request: Request, token: str) -> Response:
-        approved = None
-        if _TOKEN.fullmatch(token):
-            approved = await db.run(db.valid_invite, hash_token(token), ctx.now())
-        # no-referrer: the token is in this URL, so links on the page must not carry it elsewhere.
-        headers = {**_NO_STORE, "Referrer-Policy": "no-referrer"}
-        if approved is None:
-            return ctx.render(request, "invite.html", status=404, valid=False, first_name="", headers=headers)
-        first_name = approved.name.split()[0] if approved.name.split() else ""
-        return ctx.render(request, "invite.html", valid=True, first_name=first_name, headers=headers)
-
     return router
 
 
@@ -184,6 +181,7 @@ class CloudService:
     async def start(self) -> None:
         # Finish the first purge before serving, so expired data is never shown after a restart.
         await self._purge_logged()
+        await refresh_live(self.ctx)
         self._task = asyncio.create_task(self._loop())
 
     async def stop(self) -> None:
@@ -197,27 +195,39 @@ class CloudService:
 def install(
     app: FastAPI,
     settings: Settings,
-    personas: dict[str, Persona],
+    registry: PersonaRegistry,
     client_ip: Callable[[Request], str],
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> CloudService:
     """Add the cloud pages to the voice server. Called only when CLOUD_MODE=1."""
     cloud = settings.cloud
     assert cloud is not None  # noqa: S101 - create_app checks this
+    db = CloudDB(settings.data_dir / "cloud.db")
     ctx = CloudContext(
         settings=settings,
         cloud=cloud,
-        db=CloudDB(settings.data_dir / "cloud.db"),
+        db=db,
         keys=Keys(cloud.session_secret),
         mailer=Mailer(cloud.smtp),
-        personas=personas,
+        registry=registry,
+        store=StudioStore(db),
+        files=FileStore(settings.data_dir),
         client_ip=client_ip,
         transport=transport,
     )
     app.state.cloud = ctx
+    admin_auth = AdminAuth(ctx)
+    members = MemberAuth(ctx)
+    member_admin = MemberAdmin(ctx, admin_auth)
+    # Unpublished personas answer only their signed-in owner (or the site owner reviewing them).
+    registry.preview = preview_hook(ctx, members, admin_auth.signed_in)
     app.mount("/cloud/static", StaticFiles(directory=STATIC_DIR), name="cloud-static")
     app.include_router(public_router(ctx))
-    app.include_router(admin_router(ctx))
+    app.include_router(accounts_router(ctx, members))
+    app.include_router(Studio(ctx, members).router())
+    app.include_router(profile_router(ctx, members, admin_auth.signed_in))
+    app.include_router(admin_router(ctx, admin_auth, member_admin.tabs))
+    app.include_router(member_admin.router())
 
     @app.middleware("http")
     async def cloud_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -229,9 +239,12 @@ def install(
             response.headers["X-Frame-Options"] = "DENY"
             if cloud.secure:
                 response.headers["Strict-Transport-Security"] = "max-age=31536000"
-        if path.startswith(("/admin", "/invite/")):
+        if path.startswith(_PRIVATE_PREFIXES):
             response.headers.update(_NO_STORE)
             response.headers["X-Frame-Options"] = "DENY"
+            if path.startswith(("/invite/", "/join/", "/login/reset/")):
+                # The token is in the URL, so links on these pages must not carry it elsewhere.
+                response.headers["Referrer-Policy"] = "no-referrer"
         return response
 
     async def html_errors(request: Request, exc: Exception) -> Response:

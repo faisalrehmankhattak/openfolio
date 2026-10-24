@@ -95,7 +95,7 @@ def test_approval_emails_the_invite(mail_settings, smtp):
     token = approve(client, mail_settings)
     invite = smtp.sent[-1]
     assert invite["To"] == "jane@example.com"
-    assert f"{PUBLIC_URL}/invite/{token}" in invite.get_content()
+    assert f"{PUBLIC_URL}/join/{token}" in invite.get_content()
     assert ("invite emailed",) in rows(mail_settings, "SELECT detail FROM audit_log WHERE action = 'request.approved'")
 
 

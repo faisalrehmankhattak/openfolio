@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% set noindex = true %}
+{% block title %}Sign in · Openfolio Cloud{% endblock %}
+{% block head %}<link rel="stylesheet" href="/cloud/static/studio.css?v={{ asset_version }}"><script src="/cloud/static/studio.js?v={{ asset_version }}" defer></script>{% endblock %}
+{% block body_class %}auth{% endblock %}
+{% block main %}
+<section class="page-center auth-page">
+  <form class="card auth-card" method="post" action="/login" novalidate>
+    <input type="hidden" name="form_token" value="{{ form_token }}">
+    <span class="notice-icon notice-ink">{{ icon("lock", 24) }}</span>
+    <h1>Sign in to the Studio</h1>
+    <p class="muted">For members of the Openfolio Cloud beta.</p>
+    {% if error %}
+    <div class="alert alert-error" role="alert">{{ icon("alert", 18) }}<p>{{ error }}</p></div>
+    {% elif notice %}
+    <div class="alert alert-ok" role="status">{{ icon("check", 18) }}<p>{{ notice }}</p></div>
+    {% endif %}
+    <div class="field">
+      <label for="email">Email</label>
+      <input class="input" id="email" name="email" type="email" value="{{ email }}" autocomplete="username" required{% if not email %} autofocus{% endif %}>
+    </div>
+    <div class="field">
+      <div class="label-row"><label for="password">Password</label><a class="label-link" href="/login/forgot">Forgot password?</a></div>
+      <div class="input-reveal"><input class="input" id="password" name="password" type="password" autocomplete="current-password" required{% if email %} autofocus{% endif %}{% if error %} aria-invalid="true"{% endif %}><button class="reveal" type="button" data-reveal="#password" aria-label="Show password">{{ icon("eye", 18) }}</button></div>
+    </div>
+    <button class="btn btn-primary btn-large btn-block" type="submit">Sign in</button>
+    <p class="fine-print center">No account yet? Openfolio Cloud is invite-only. <a href="/#request">Request access</a></p>
+  </form>
+</section>
+{% endblock %}

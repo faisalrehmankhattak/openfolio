@@ -1,6 +1,6 @@
 """HTTP and WebRTC signalling server.
 
-GET   /v1/personas/{id}               public profile shown before a call
+GET   /v1/personas/{id}               public profile shown before a call ("{handle}~preview": owner-only draft)
 GET   /v1/personas/{id}/ice-servers   STUN/TURN settings for the browser
 POST  /v1/personas/{id}/offer         WebRTC offer -> answer; starts a conversation
 PATCH /v1/personas/{id}/offer         trickled ICE candidates
@@ -43,6 +43,7 @@ from .config import ROOT, Settings, load_settings
 from .doctor import run_checks
 from .ice import IceProvider
 from .persona import Persona, load_personas
+from .registry import PREVIEW_SUFFIX, PersonaRegistry
 
 if TYPE_CHECKING:
     from .cloud.routes import CloudService
@@ -124,7 +125,7 @@ async def read_json(request: Request, model: type[BaseModel]) -> Any:
 def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
     """Build the server. transport replaces the network for outbound HTTP (Cloudflare) in tests."""
     settings = settings or load_settings()
-    personas = load_personas(settings.personas_dir)
+    registry = PersonaRegistry(load_personas(settings.personas_dir))
     handler = SmallWebRTCRequestHandler(ice_servers=[IceServer(**s) for s in settings.ice_servers] or None)
     ice = IceProvider(settings, transport)
     active: dict[str, asyncio.Task[None]] = {}
@@ -140,9 +141,13 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
     def ip(request: Request) -> str:
         return client_ip(request, settings.trust_proxy)
 
-    def get_persona(persona_id: str) -> Persona:
-        if persona := personas.get(persona_id):
-            return persona
+    async def get_persona(request: Request, persona_id: str) -> tuple[Persona, bool]:
+        """The persona and whether it is a private preview (never cached, never shared)."""
+        if persona_id.endswith(PREVIEW_SUFFIX) and registry.preview:
+            if preview := await registry.preview(request, persona_id.removesuffix(PREVIEW_SUFFIX)):
+                return preview, True
+        elif persona := registry.get(persona_id):
+            return persona, False
         raise HTTPException(404, "Unknown persona")
 
     def check_origin(request: Request, persona: Persona) -> None:
@@ -169,7 +174,7 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         for problem in settings.check():
             logger.warning(f"Config: {problem}")
-        logger.info(f"Loaded personas: {', '.join(personas) or 'none'}")
+        logger.info(f"Loaded personas: {', '.join(registry.files) or 'none'}")
         if os.getenv("OPENFOLIO_SKIP_CHECKS") != "1":
             checks.update(await run_checks(settings))
         if not all(c["ok"] for c in checks.values()):
@@ -185,9 +190,8 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
 
     app = FastAPI(title="Openfolio", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 
-    allowed = set(dev_origins)
-    for p in personas.values():
-        allowed |= p.origins
+    # Cloud personas run on PUBLIC_URL, which is already in dev_origins.
+    allowed = set(dev_origins) | registry.origins()
     app.add_middleware(GZipMiddleware, minimum_size=1024)
     app.add_middleware(
         CORSMiddleware,
@@ -216,13 +220,18 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
         return JSONResponse(body, status_code=200 if ok else 503)
 
     @app.get("/v1/personas/{persona_id}")
-    async def persona_info(persona_id: str) -> JSONResponse:
+    async def persona_info(persona_id: str, request: Request) -> JSONResponse:
         # Fetched by the launcher on every page view of the host site.
-        return JSONResponse(get_persona(persona_id).public_view(), headers={"Cache-Control": "public, max-age=300"})
+        persona, private = await get_persona(request, persona_id)
+        if private:
+            cache = "private, no-store"
+        else:  # a member's page can be paused, so their profile is cached briefly
+            cache = "public, max-age=60" if registry.is_dynamic(persona_id) else "public, max-age=300"
+        return JSONResponse(persona.public_view(), headers={"Cache-Control": cache})
 
     @app.get("/v1/personas/{persona_id}/ice-servers")
     async def ice_servers(persona_id: str, request: Request) -> JSONResponse:
-        check_origin(request, get_persona(persona_id))
+        check_origin(request, (await get_persona(request, persona_id))[0])
         # Fetched right before every call, so the widget can explain a refusal before WebRTC starts retrying.
         check_capacity()
         if not is_local_test(request) and not ice_limit.allow(ip(request)):
@@ -231,7 +240,7 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
 
     @app.post("/v1/personas/{persona_id}/offer")
     async def offer(persona_id: str, request: Request) -> Any:
-        persona = get_persona(persona_id)
+        persona, _ = await get_persona(request, persona_id)
         check_origin(request, persona)
         body: OfferBody = await read_json(request, OfferBody)
         # A call started by typing already carries a question; a greeting would race it.
@@ -263,7 +272,7 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
 
     @app.patch("/v1/personas/{persona_id}/offer")
     async def ice_candidate(persona_id: str, request: Request) -> dict[str, str]:
-        check_origin(request, get_persona(persona_id))
+        check_origin(request, (await get_persona(request, persona_id))[0])
         body: PatchBody = await read_json(request, PatchBody)
         if not is_known_connection(body.pc_id):
             raise HTTPException(404, "Unknown connection")
@@ -281,7 +290,7 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
     if settings.cloud:
         from .cloud.routes import install  # self-hosted servers never load the cloud pages
 
-        cloud_service = install(app, settings, personas, ip, transport)
+        cloud_service = install(app, settings, registry, ip, transport)
         return app
 
     demo = ROOT / "demo" / "index.html"

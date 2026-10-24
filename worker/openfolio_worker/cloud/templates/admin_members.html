@@ -1,0 +1,74 @@
+{% extends "admin_base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Members · Openfolio Cloud admin{% endblock %}
+{% block head %}<link rel="stylesheet" href="/cloud/static/studio.css?v={{ asset_version }}">{% endblock %}
+{% block header_actions %}
+<form class="inline-form" method="post" action="/admin/logout">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="btn btn-ghost btn-small" type="submit">{{ icon("logout", 16) }} Sign out</button>
+</form>
+{% endblock %}
+{% block main %}
+<div class="wrap admin-main">
+  <div class="admin-title"><div><h1>Members</h1><p class="muted">Everyone with an account. Pausing takes their page and AI offline and signs them out.</p></div></div>
+  {% if flash %}
+    {% if flash.kind == "reset" %}
+    <section class="flash flash-invite" role="status" aria-labelledby="flash-title">
+      <div class="flash-head">
+        <span class="flash-icon">{{ icon("lock", 20) }}</span>
+        <div>
+          <h2 id="flash-title">Reset link for @{{ flash.handle }}</h2>
+          <p>
+            {% if flash.emailed is sameas true %}It was emailed to {{ flash.email }}.
+            {% elif flash.emailed is sameas false %}The email to {{ flash.email }} failed. Send this link yourself.
+            {% else %}Send this link to {{ flash.email }}.
+            {% endif %}
+            It works once, for one hour, and is shown only this time.
+          </p>
+        </div>
+      </div>
+      <div class="copy-row">
+        <input class="input mono" id="reset-link" type="text" readonly value="{{ flash.link }}" aria-label="Reset link for @{{ flash.handle }}">
+        <button class="btn btn-primary" type="button" data-copy="#reset-link">{{ icon("link", 16) }} <span>Copy link</span></button>
+      </div>
+    </section>
+    {% else %}
+    <p class="flash flash-note" role="status">{{ icon("check", 18) }} <span>{{ flash.text }}</span></p>
+    {% endif %}
+  {% endif %}
+{% include "_admin_tabs.html" %}
+
+  {% if members %}
+  <div class="table-wrap member-table">
+    <table>
+      <thead><tr><th scope="col">Member</th><th scope="col">Status</th><th scope="col">Page</th><th scope="col">Joined</th><th scope="col">Last active</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody>
+        {% for m in members %}
+        <tr>
+          <td><p class="strong mono">@{{ m.handle }}</p><p class="muted small">{{ m.name }} · {{ m.email }}</p></td>
+          <td><span class="badge {{ 'badge-ok' if m.status == 'active' else 'badge-warn' }}">{{ m.status|capitalize }}</span></td>
+          <td>{% if m.persona_status == "live" and m.status == "active" %}<a href="/p/{{ m.handle }}" target="_blank" rel="noopener">Live {{ icon("external", 14) }}</a>{% else %}<span class="muted">{{ {"draft": "Draft", "pending": "In review", "rejected": "Sent back", "paused": "Paused by member", "live": "Live (account paused)"}.get(m.persona_status, "None") }}</span>{% endif %}</td>
+          <td><time datetime="{{ m.created_at|iso }}" title="{{ m.created_at|when }}" data-local>{{ m.created_at|ago(now) }}</time></td>
+          <td>{% if m.last_active_at %}<time datetime="{{ m.last_active_at|iso }}" title="{{ m.last_active_at|when }}" data-local>{{ m.last_active_at|ago(now) }}</time>{% else %}<span class="muted">Never</span>{% endif %}</td>
+          <td class="row-actions">
+            <form class="inline-form" method="post" action="/admin/members/{{ m.id }}/{{ 'pause' if m.status == 'active' else 'unpause' }}"{% if m.status == "active" %} data-confirm="Pause @{{ m.handle }}? Their page goes offline and they are signed out."{% endif %}>
+              <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-soft btn-small" type="submit">{{ "Pause" if m.status == "active" else "Unpause" }}</button>
+            </form>
+            <form class="inline-form" method="post" action="/admin/members/{{ m.id }}/reset">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-ghost btn-small" type="submit">Reset link</button>
+            </form>
+            <form class="inline-form" method="post" action="/admin/members/{{ m.id }}/delete" data-confirm="Delete @{{ m.handle }} and all their data? This can't be undone.">
+              <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-danger btn-small" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty"><span class="notice-icon notice-ink">{{ icon("user", 24) }}</span><p>No members yet. Approved people appear here once they create their account.</p></div>
+  {% endif %}
+{% include "_admin_audit.html" %}
+</div>
+{% endblock %}

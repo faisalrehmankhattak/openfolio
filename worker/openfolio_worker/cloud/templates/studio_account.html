@@ -1,0 +1,62 @@
+{% extends "studio_base.html" %}
+{% from "_icons.html" import icon %}
+{% block page_title %}Account{% endblock %}
+{% macro err(key) %}{% if errors.get(key) %}<p class="field-error" id="{{ key }}-error">{{ icon("alert", 14) }}<span>{{ errors[key] }}</span></p>{% endif %}{% endmacro %}
+{% macro inv(key) %}{% if errors.get(key) %} aria-invalid="true" aria-describedby="{{ key }}-error"{% endif %}{% endmacro %}
+{% block content %}
+<header class="page-head">
+  <p class="kicker">Account</p>
+  <h1>Account and data</h1>
+  <p class="page-lead">Your data is yours: download it any time, or delete everything.</p>
+</header>
+
+<section class="panel">
+  <h2 class="panel-title">Your account</h2>
+  <dl class="facts">
+    <div><dt>Handle</dt><dd class="mono">@{{ user.handle }}</dd></div>
+    <div><dt>Email</dt><dd>{{ user.email }}</dd></div>
+    <div><dt>Member since</dt><dd><time datetime="{{ user.created_at|iso }}" data-local>{{ user.created_at|when }}</time></dd></div>
+    <div><dt>Signed in on</dt><dd>{{ sessions }} device{{ "s" if sessions != 1 }}</dd></div>
+  </dl>
+</section>
+
+<section class="panel" aria-labelledby="pw-title">
+  <h2 class="panel-title" id="pw-title">Change password</h2>
+  <form class="narrow-form" method="post" action="/studio/account/password" novalidate>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input class="sr-only" type="text" name="username" value="{{ user.email }}" autocomplete="username" tabindex="-1" aria-hidden="true">
+    <div class="field">
+      <label for="current">Current password</label>
+      <input class="input" id="current" name="current" type="password" autocomplete="current-password" required{{ inv("current") }}>
+      {{ err("current") }}
+    </div>
+    <div class="field">
+      <label for="new-password">New password</label>
+      <input class="input" id="new-password" name="password" type="password" autocomplete="new-password" minlength="12" required aria-describedby="pw-hint"{{ inv("password") }}>
+      <p class="hint" id="pw-hint">At least 12 characters. Changing it signs out your other devices.</p>
+      {{ err("password") }}
+    </div>
+    <button class="btn btn-primary" type="submit">Change password</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2 class="panel-title">Download your data</h2>
+  <p class="muted">A zip with everything we store about you: your account, profile versions, reviews, and every file you uploaded with the text we read from it.</p>
+  <a class="btn btn-soft" href="/studio/account/export">{{ icon("download", 16) }} Download my data</a>
+</section>
+
+<section class="panel danger-zone" aria-labelledby="delete-title">
+  <h2 class="panel-title" id="delete-title">Delete account</h2>
+  <p class="muted">This erases your page, your AI, your files, your sessions and your original access request. It can't be undone.</p>
+  <form class="narrow-form" method="post" action="/studio/account/delete" novalidate data-confirm="Delete your account and all your data? This can't be undone.">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div class="field">
+      <label for="confirm">Type <strong class="mono">{{ user.handle }}</strong> to confirm</label>
+      <input class="input" id="confirm" name="confirm" type="text" autocomplete="off" spellcheck="false" required{{ inv("confirm") }}>
+      {{ err("confirm") }}
+    </div>
+    <button class="btn btn-danger" type="submit">{{ icon("trash", 16) }} Delete my account</button>
+  </form>
+</section>
+{% endblock %}

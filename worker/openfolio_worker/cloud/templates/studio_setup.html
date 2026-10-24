@@ -1,0 +1,144 @@
+{% extends "studio_base.html" %}
+{% from "_icons.html" import icon %}
+{% block page_title %}Setup{% endblock %}
+{% block extra_head %}{% if job and job.state == "running" %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
+{% set has_docs = documents|length > 0 %}
+{% set running = job and job.state == "running" %}
+{% block content %}
+<header class="page-head">
+  <p class="kicker">Setup</p>
+  <h1>Let's draft your AI</h1>
+  <p class="page-lead">Upload your résumé, LinkedIn PDF export or portfolio document, or paste text, plus a photo. We draft your AI.</p>
+</header>
+
+<ol class="stepper" aria-label="Progress">
+  <li class="step-item{% if has_docs %} is-done{% else %} is-current{% endif %}"><span class="step-dot">{% if has_docs %}{{ icon("check", 14) }}{% else %}1{% endif %}</span><span>Add your material</span></li>
+  <li class="step-item{% if record.drafted_at %} is-done{% elif has_docs %} is-current{% endif %}"><span class="step-dot">{% if record.drafted_at %}{{ icon("check", 14) }}{% else %}2{% endif %}</span><span>Draft with AI</span></li>
+  <li class="step-item{% if record.drafted_at %} is-current{% endif %}"><span class="step-dot">3</span><span>Review and publish</span></li>
+</ol>
+
+{% if error %}
+<div class="alert alert-error" role="alert">{{ icon("alert", 18) }}<p>{{ error }}</p></div>
+{% endif %}
+
+{% if job %}
+<section class="panel draft-progress{% if job.state == 'failed' %} is-failed{% elif job.state == 'done' %} is-done{% endif %}" id="draft" aria-live="polite"{% if running %} data-draft-status="/studio/draft/status"{% endif %}>
+  {% if job.state == "failed" %}
+    <div class="dp-head"><span class="dp-icon dp-icon-error">{{ icon("alert", 22) }}</span><div><h2>The draft didn't work</h2><p class="muted">{{ job.error }}</p></div></div>
+  {% elif job.state == "done" %}
+    <div class="dp-head"><span class="dp-icon dp-icon-ok">{{ icon("check", 22) }}</span><div><h2>Your draft is ready</h2><p class="muted">Check every fact before you submit it. Nothing is public yet.</p></div>
+    <a class="btn btn-primary" href="/studio/profile?m=drafted">Review your profile {{ icon("arrow", 16) }}</a></div>
+  {% else %}
+    <div class="dp-head"><span class="dp-icon dp-spin" aria-hidden="true"></span><div><h2>Drafting your AI…</h2><p class="muted" data-draft-label>{{ job.label }}. This usually takes 15 to 40 seconds.</p></div></div>
+    <ol class="dp-steps">
+      {% for key, label in (("reading", "Reading your documents"), ("drafting", "Writing your draft"), ("checking", "Checking facts, links and safety")) %}
+      {% set order = ["reading", "drafting", "checking", "done"] %}
+      <li data-step="{{ key }}" class="{% if order.index(job.step) > order.index(key) %}is-done{% elif job.step == key %}is-current{% endif %}"><span class="dp-dot" aria-hidden="true"></span>{{ label }}</li>
+      {% endfor %}
+    </ol>
+    <div class="dp-bar" aria-hidden="true"><span></span></div>
+  {% endif %}
+</section>
+{% endif %}
+
+<div class="setup-grid">
+  <section class="panel" id="documents" aria-labelledby="documents-title">
+    <div class="panel-head">
+      <span class="panel-icon">{{ icon("file", 20) }}</span>
+      <div>
+        <h2 id="documents-title">Documents</h2>
+        <p class="muted">Your résumé, a LinkedIn “Save to PDF” export or a portfolio write-up.</p>
+      </div>
+    </div>
+    <form class="upload" method="post" action="/studio/files" enctype="multipart/form-data" data-upload>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="slot" value="document">
+      <label class="dropzone" for="document-file">
+        <span class="dz-icon">{{ icon("upload", 22) }}</span>
+        <span class="dz-text"><strong>Choose a file</strong> or drop it here</span>
+        <span class="dz-hint" data-file-name>PDF (10 MB, 30 pages) · Word .docx (5 MB) · text (200 KB)</span>
+        <input class="dz-input" id="document-file" name="file" type="file" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown" required>
+      </label>
+      <button class="btn btn-primary btn-block" type="submit" data-busy="Reading the file…">{{ icon("upload", 16) }} Upload document</button>
+    </form>
+
+    {% if documents %}
+    <ul class="file-list">
+      {% for f in documents %}
+      <li class="file-row">
+        <span class="file-badge">{{ "TXT" if f.mime == "text/plain" else ("DOCX" if "word" in f.mime else "PDF") }}</span>
+        <div class="file-main">
+          <p class="file-name">{% if f.original_name == "Pasted text" %}Pasted text{% else %}<a href="/studio/files/{{ f.id }}">{{ f.original_name }}</a>{% endif %}</p>
+          <p class="file-meta">{{ f.size|size }} · {{ "{:,}".format(f.text|length) }} characters read</p>
+          <details class="file-text">
+            <summary>{{ icon("eye", 14) }} What we read</summary>
+            <pre class="extract">{{ f.text[:3000] }}{% if f.text|length > 3000 %}
+…{% endif %}</pre>
+          </details>
+        </div>
+        <form class="inline-form" method="post" action="/studio/files/{{ f.id }}/delete" data-confirm="Delete {{ f.original_name }}?">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button class="icon-btn" type="submit" aria-label="Delete {{ f.original_name }}">{{ icon("trash", 18) }}</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    <details class="paste"{% if not documents %} open{% endif %}>
+      <summary>{{ icon("edit", 16) }} Or paste text</summary>
+      <form method="post" action="/studio/text">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="sr-only" for="paste-text">Text about you</label>
+        <textarea class="input textarea" id="paste-text" name="text" rows="6" maxlength="40000" placeholder="Paste your LinkedIn About and Experience sections, a bio, or anything recruiters should know."></textarea>
+        <div class="paste-actions"><span class="hint" data-count-for="paste-text" data-max="40000">Up to 40,000 characters.</span><button class="btn btn-soft btn-small" type="submit">Save text</button></div>
+      </form>
+    </details>
+  </section>
+
+  <section class="panel" id="photo" aria-labelledby="photo-title">
+    <div class="panel-head">
+      <span class="panel-icon">{{ icon("image", 20) }}</span>
+      <div>
+        <h2 id="photo-title">Photo</h2>
+        <p class="muted">Shown on your page and blended into your AI's launcher button.</p>
+      </div>
+    </div>
+    <div class="photo-stage">
+      {% if photo_url %}
+      <img class="photo-preview" src="{{ photo_url }}" alt="Your photo" width="168" height="168">
+      {% else %}
+      <span class="photo-preview photo-empty" aria-hidden="true">{{ icon("user", 56) }}</span>
+      {% endif %}
+    </div>
+    <form class="upload" method="post" action="/studio/files" enctype="multipart/form-data" data-upload>
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="slot" value="photo">
+      <label class="dropzone dropzone-compact" for="photo-file">
+        <span class="dz-text"><strong>{{ "Replace photo" if photo_url else "Choose a photo" }}</strong></span>
+        <span class="dz-hint" data-file-name>JPEG, PNG or WebP, up to 5 MB</span>
+        <input class="dz-input" id="photo-file" name="file" type="file" accept="image/jpeg,image/png,image/webp" required>
+      </label>
+      <button class="btn btn-soft btn-block" type="submit" data-busy="Processing…">{{ icon("upload", 16) }} Upload photo</button>
+    </form>
+    <p class="fine-print">{{ icon("shield", 14) }} We crop it to a square and remove location and camera data. It's public only once your page is live.</p>
+  </section>
+</div>
+
+<section class="panel draft-cta" aria-labelledby="draft-title">
+  <div class="draft-cta-copy">
+    <span class="panel-icon panel-icon-accent">{{ icon("sparkle", 20) }}</span>
+    <div>
+      <h2 id="draft-title">{{ "Draft again" if record.drafted_at else "Draft my AI" }}</h2>
+      <p class="muted">{% if record.drafted_at %}A new draft replaces the text in your profile. Your photo, voice and avatar stay.{% else %}We read your documents and fill in your profile: title, about, experience, projects, skills and links. Nothing is published; you check every fact first.{% endif %}</p>
+    </div>
+  </div>
+  <form method="post" action="/studio/draft"{% if record.drafted_at %} data-confirm="Replace your profile text with a new AI draft?"{% endif %}>
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn btn-primary btn-large" type="submit"{% if not has_docs or running %} disabled{% endif %}>{{ icon("sparkle", 18) }} {{ "Draft again" if record.drafted_at else "Draft my AI" }}</button>
+  </form>
+  {% if not has_docs %}<p class="hint draft-hint">Add a document or paste some text first.</p>{% endif %}
+</section>
+
+<p class="usage">{{ usage.count }} of {{ usage.max_files }} files · {{ usage.bytes|size }} of 30 MB used{% if record.drafted_at %} · <a href="/studio/profile">Go to your profile {{ icon("arrow", 14) }}</a>{% endif %}</p>
+{% endblock %}

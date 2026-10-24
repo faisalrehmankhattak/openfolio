@@ -1,0 +1,96 @@
+{% extends "studio_base.html" %}
+{% from "_icons.html" import icon %}
+{% block page_title %}Publish{% endblock %}
+{% set s = record.status %}
+{% block content %}
+<header class="page-head">
+  <p class="kicker">Publish</p>
+  <h1>{% if s in ("live", "paused") %}Your page{% else %}Go live{% endif %}</h1>
+  <p class="page-lead">Every page is checked by a person before it goes live. After that, your page and your AI are public at your own address.</p>
+</header>
+
+<ol class="timeline" aria-label="Status">
+  <li class="{{ 'is-done' if s != 'draft' else 'is-current' }}"><span class="tl-dot">{% if s != "draft" %}{{ icon("check", 14) }}{% else %}1{% endif %}</span><span>Draft</span></li>
+  <li class="{% if s in ('live', 'paused') %}is-done{% elif s in ('pending', 'rejected') %}is-current{% endif %}"><span class="tl-dot">{% if s in ("live", "paused") %}{{ icon("check", 14) }}{% else %}2{% endif %}</span><span>Review</span></li>
+  <li class="{% if s in ('live', 'paused') %}is-current{% endif %}"><span class="tl-dot">3</span><span>Live</span></li>
+</ol>
+
+<section class="panel status-panel status-{{ s }}">
+  <div class="status-head">
+    <span class="status-pill pill-{{ s }}">{{ status_label }}</span>
+    {% if record.published_at %}<span class="muted">Last approved <time datetime="{{ record.published_at|iso }}" data-local>{{ record.published_at|ago(now) }}</time></span>{% endif %}
+  </div>
+
+  {% if s == "draft" %}
+    {% if missing %}
+    <h2>Almost there</h2>
+    <p class="muted">Add {{ missing|join(", ") }} to your profile, then submit it for review.</p>
+    <div class="status-actions"><a class="btn btn-primary" href="/studio/profile">{{ icon("edit", 16) }} Complete your profile</a></div>
+    {% else %}
+    <h2>Ready for review</h2>
+    <p class="muted">We check that the page is really about you and safe to show. It usually takes less than a day.</p>
+    <form class="status-actions" method="post" action="/studio/publish/submit">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-primary btn-large" type="submit">{{ icon("arrow", 18) }} Submit for review</button>
+      <a class="btn btn-ghost btn-large" href="/studio/preview">{{ icon("play", 18) }} Preview first</a>
+    </form>
+    {% endif %}
+  {% elif s == "pending" %}
+    <h2>In review</h2>
+    <p class="muted">Submitted {% if open_review %}<time datetime="{{ open_review.submitted_at|iso }}" data-local>{{ open_review.submitted_at|ago(now) }}</time>{% endif %}. You can keep editing; the reviewer sees the version you submitted.</p>
+    <form class="status-actions" method="post" action="/studio/publish/withdraw" data-confirm="Withdraw your submission?">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="btn btn-soft" type="submit">Withdraw</button>
+    </form>
+  {% elif s == "rejected" %}
+    <h2>A few changes are needed</h2>
+    {% if latest and latest.note %}<blockquote class="review-note"><p class="review-note-label">Note from the reviewer</p><p>{{ latest.note }}</p></blockquote>{% else %}<p class="muted">The reviewer asked for changes. Update your profile and submit it again.</p>{% endif %}
+    <form class="status-actions" method="post" action="/studio/publish/submit">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <a class="btn btn-ghost" href="/studio/profile">{{ icon("edit", 16) }} Edit profile</a>
+      <button class="btn btn-primary" type="submit"{% if missing %} disabled{% endif %}>Submit again</button>
+    </form>
+  {% else %}
+    <h2>{% if s == "live" %}Your page is live{% else %}Your page is paused{% endif %}</h2>
+    <p class="muted">{% if s == "live" %}Recruiters can visit your page and talk to your AI.{% else %}Visitors see a “not found” page and your AI doesn't answer until you resume.{% endif %}</p>
+    <div class="copy-field">
+      <label for="page-url">Your page</label>
+      <div class="copy-row">
+        <input class="input mono" id="page-url" type="text" readonly value="{{ page_url }}">
+        <button class="btn btn-soft" type="button" data-copy-from="#page-url">{{ icon("copy", 16) }} <span>Copy</span></button>
+        <a class="btn btn-ghost" href="/p/{{ user.handle }}" target="_blank" rel="noopener">{{ icon("external", 16) }} Open</a>
+      </div>
+    </div>
+    <div class="copy-field">
+      <label for="embed-snippet">Add your AI to any website</label>
+      <p class="hint">Paste this before the closing &lt;/body&gt; tag. Custom domains are coming soon; for now it runs on your Openfolio page.</p>
+      <div class="copy-row">
+        <textarea class="input mono snippet-box" id="embed-snippet" rows="2" readonly>{{ embed_snippet }}</textarea>
+        <button class="btn btn-soft" type="button" data-copy-from="#embed-snippet">{{ icon("code", 16) }} <span>Copy</span></button>
+      </div>
+    </div>
+    {% if record.has_unpublished_changes %}
+    <div class="callout callout-info">{{ icon("edit", 18) }}<div>
+      {% if open_review %}<p><strong>Your changes are in review.</strong> The live page keeps the approved version until then.</p>
+      {% else %}<p><strong>You have changes that aren't live yet.</strong> Submit them for a quick review.</p>
+      <form method="post" action="/studio/publish/submit"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primary btn-small" type="submit"{% if missing %} disabled{% endif %}>Submit changes</button></form>{% endif %}
+    </div></div>
+    {% endif %}
+    <div class="settings-row">
+      <form class="toggle-form" method="post" action="/studio/publish/search">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label class="switch"><input type="checkbox" name="show_in_search" data-autosubmit{% if record.show_in_search %} checked{% endif %}><span class="switch-track" aria-hidden="true"></span><span><strong>Show in search engines</strong><span class="muted block">Lets Google and AI assistants find your page.</span></span></label>
+        <noscript><button class="btn btn-soft btn-small" type="submit">Save</button></noscript>
+      </form>
+      <form method="post" action="/studio/publish/{{ 'pause' if s == 'live' else 'resume' }}"{% if s == "live" %} data-confirm="Pause your page? Visitors won't see it until you resume."{% endif %}>
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn {{ 'btn-soft' if s == 'live' else 'btn-primary' }}" type="submit">{{ icon("pause" if s == "live" else "play", 16) }} {{ "Pause page" if s == "live" else "Resume page" }}</button>
+      </form>
+    </div>
+  {% endif %}
+</section>
+
+{% if latest and latest.decided_at and s not in ("rejected",) and latest.note %}
+<section class="panel"><h2 class="panel-title">Last review</h2><blockquote class="review-note"><p>{{ latest.note }}</p></blockquote></section>
+{% endif %}
+{% endblock %}
