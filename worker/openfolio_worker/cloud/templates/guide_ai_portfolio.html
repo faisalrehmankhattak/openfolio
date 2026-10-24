@@ -1,0 +1,61 @@
+{% extends "article.html" %}
+{% block lead %}An AI portfolio is a portfolio website with an AI version of you built in. Visitors ask questions about your work and get answers, by voice or chat, drawn only from what you wrote.{% endblock %}
+{% block answer %}
+<p>An <strong>AI portfolio</strong> is a personal portfolio with a conversational AI version of its owner. Instead of only reading pages, a recruiter or client can ask "What did you build at your last job?" and get an answer in seconds, grounded in the owner's own résumé, projects and rules. A good one is always labelled as AI, never invents facts, and hands off to the real person when it doesn't know.</p>
+{% endblock %}
+{% block body %}
+<h2 id="what">What an AI portfolio is</h2>
+<p>An AI portfolio adds a conversation to the portfolio you already have. It has three parts:</p>
+<ol>
+  <li><strong>Your material.</strong> Your résumé, projects, experience, skills and links, plus rules about what not to discuss.</li>
+  <li><strong>An AI that answers only from that material.</strong> It speaks in the first person as an AI version of you and declines questions it has no facts for.</li>
+  <li><strong>An interface on your site.</strong> A chat window, a voice call or, with Openfolio, a 3D avatar that speaks with lip-sync.</li>
+</ol>
+
+<h2 id="difference">How it differs from a regular portfolio</h2>
+<ul>
+  <li><strong>It answers the visitor's question.</strong> A static portfolio shows the same pages to everyone; an AI portfolio responds to what each visitor wants to know.</li>
+  <li><strong>It gets to the detail faster.</strong> Visitors ask instead of hunting through pages for your role, tools or results.</li>
+  <li><strong>It works when you can't.</strong> It answers first questions at any hour, in any time zone.</li>
+  <li><strong>It doesn't replace your portfolio.</strong> It sits on top of it. Your case studies still matter, because they are what the AI draws on.</li>
+</ul>
+
+<h2 id="when">When an AI portfolio helps, and when it doesn't</h2>
+<p>It helps most when:</p>
+<ul>
+  <li>Recruiters, hiring managers or clients arrive at your site with specific questions.</li>
+  <li>Your work has depth that is hard to show on a page: decisions, trade-offs and context.</li>
+  <li>The people hiring you are in other time zones.</li>
+</ul>
+<p>It helps less when you have very little material yet, because the AI can only be as good as what you give it, or when portfolios play no part in hiring for your role.</p>
+
+<h2 id="build">How to build an AI portfolio in five steps</h2>
+<ol class="numbered">
+  <li><strong>Gather your material.</strong> Your résumé, three to five projects (the problem, your role and the result) and the links you want to share.</li>
+  <li><strong>Write the facts the AI may use.</strong> Short, specific statements work better than long prose. Include numbers only if they are true and you are happy to repeat them.</li>
+  <li><strong>Set your rules.</strong> Decide what the AI must never discuss, for example salary or a former employer's confidential work.</li>
+  <li><strong>Test it like a recruiter.</strong> Ask the ten questions you hear most, plus a few it shouldn't answer. Fix anything vague or wrong.</li>
+  <li><strong>Publish and share.</strong> Add it to your site with one line of code or share a link, and put that link in your résumé, email signature and applications.</li>
+</ol>
+
+<h2 id="checklist">What to look for in an AI portfolio builder</h2>
+<ul class="checks">
+  <li><strong>Clear AI disclosure.</strong> Visitors should always know they are talking to an AI.</li>
+  <li><strong>Grounded answers.</strong> It should answer only from your material and say "I don't know" otherwise.</li>
+  <li><strong>Control.</strong> You review and edit everything, and you can pause or delete it.</li>
+  <li><strong>Works where you are.</strong> An embed for your own site and a shareable link.</li>
+  <li><strong>Privacy.</strong> A plain statement of what it stores about you and your visitors.</li>
+  <li><strong>Voice as well as text.</strong> Talking to a face is more memorable than another chat box.</li>
+  <li><strong>Open source.</strong> If you want to inspect the code or run it yourself.</li>
+</ul>
+
+<h2 id="openfolio">Building one with Openfolio</h2>
+<p>Openfolio is an open-source AI portfolio builder. On Openfolio Cloud, now in an invite-only beta:</p>
+<ol class="numbered">
+  <li>Upload your résumé and photo.</li>
+  <li>Your AI drafts itself: projects, experience, skills and suggested questions.</li>
+  <li>Review every word, add your rules and choose a 3D avatar.</li>
+  <li>Share a link, or paste one script tag into your site.</li>
+</ol>
+<p>Prefer to run it yourself? The code is on <a href="{{ github_url }}" rel="noopener">GitHub</a> under Apache-2.0 and runs on a CPU-only server with the AI providers you choose.</p>
+{% endblock %}

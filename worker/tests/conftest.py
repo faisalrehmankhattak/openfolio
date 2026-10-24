@@ -33,6 +33,8 @@ for key in (
     "SMTP_PASSWORD",
     "SMTP_FROM",
     "NOTIFY_EMAIL",
+    "PRODUCT_HUNT_URL",
+    "GITHUB_REPO",
 ):
     os.environ.pop(key, None)
 

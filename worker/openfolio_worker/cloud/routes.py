@@ -6,6 +6,7 @@ GET  /cloud/thanks      the same thank-you page for every accepted (or silently 
 GET  /privacy, /terms   policies
 GET  /invite/{token}    invite check (stage 2 will consume the token when the Studio opens)
 /admin/...              the owner's pages (admin.py)
+robots.txt, sitemap.xml, llms.txt, guides  search and AI assistants (seo.py)
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ from .auth import Keys, hash_token
 from .db import DAY, CloudDB
 from .forms import FormError, read_form, validate_request, verify_turnstile
 from .mail import Mailer, new_request_email
+from .seo import install as install_seo
 from .web import STATIC_DIR, STRICT_CSP, CloudContext
 
 REQUESTS_PER_HOUR = 3
@@ -218,6 +220,7 @@ def install(
     app.mount("/cloud/static", StaticFiles(directory=STATIC_DIR), name="cloud-static")
     app.include_router(public_router(ctx))
     app.include_router(admin_router(ctx))
+    install_seo(app, ctx)
 
     @app.middleware("http")
     async def cloud_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:

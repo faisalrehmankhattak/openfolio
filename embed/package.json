@@ -1,7 +1,7 @@
 {
   "name": "@openfolio/embed",
   "version": "0.2.0",
-  "description": "One-line embed for a 3D talking AI avatar of you: voice and chat for your portfolio website.",
+  "description": "One-line embed for Openfolio, the open-source AI portfolio builder: a 3D AI version of you that talks to recruiters by voice or chat.",
   "scripts": {
     "build": "vite build -c vite.app.config.ts && vite build -c vite.loader.config.ts",
     "dev": "vite build -c vite.app.config.ts --watch",
@@ -30,16 +30,21 @@
     "node": ">=22.12"
   },
   "keywords": [
+    "ai-portfolio",
+    "ai-portfolio-builder",
+    "portfolio-builder",
+    "personal-portfolio",
+    "portfolio-website",
+    "ai-twin",
+    "digital-twin",
     "ai-avatar",
-    "talking-head",
     "3d-avatar",
+    "talking-head",
     "voice-assistant",
-    "portfolio",
     "chatbot",
+    "web-component",
     "webrtc",
     "pipecat",
-    "web-component",
-    "digital-twin",
     "lip-sync",
     "three.js"
   ],

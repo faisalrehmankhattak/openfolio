@@ -151,7 +151,7 @@ class CloudContext:
             now=self.now(),
             public_url=self.cloud.public_url,
             contact_email=self.contact_email,
-            github_url="https://github.com/faisalrehmankhattak/openfolio",
+            github_url=self.cloud.github_url,
             **context,
         )
         return HTMLResponse(html, status_code=status, headers={"Content-Security-Policy": csp, **(headers or {})})

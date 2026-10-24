@@ -1,0 +1,94 @@
+# Openfolio: AI portfolio builder
+
+> {{ promise }}
+
+Source: {{ public_url }}/llms-full.txt. Short version: {{ public_url }}/llms.txt.
+
+## In one sentence
+
+Openfolio is an open-source AI portfolio builder that gives anyone a 3D AI version of themselves that answers recruiters' questions about their work, by voice or chat, using only what they wrote.
+
+## Names
+
+- Openfolio is the product and the open-source project. Openfolio Cloud is the hosted service.
+- Tagline: "{{ tagline }}"
+- Openfolio is not related to an earlier investing app that also used the name Openfolio.
+
+## What it does
+
+- A visitor opens the owner's portfolio and taps Talk or Chat.
+- A 3D avatar answers by voice, with live captions and lip-sync, or by text. Typing never asks for the microphone.
+- Answers come only from the owner's profile: about, highlights, experience, projects, skills, education, links and the rules the owner sets.
+- Project, experience, skill and contact cards appear in the chat.
+- Visitors can leave their name, email and a message for the owner.
+- When a question is not covered, it says it doesn't know and suggests contacting the real person.
+
+## Who it is for
+
+- Students and new graduates applying for internships and first jobs.
+- Engineers who want hiring managers to hear about their systems, trade-offs and results.
+- Designers who want each case study to come with its reasoning.
+- Freelancers who want client questions answered while they work.
+- Career switchers who want to connect past roles with the job they want next.
+- Recruiters and hiring managers, who can interview a candidate's AI twin at any time.
+
+## How Openfolio Cloud works
+
+1. Join the waitlist at {{ public_url }}/#request. A person reads every request; approved people get a personal invite link by email.
+2. Upload your résumé and a photo.
+3. Openfolio drafts your AI's profile from them.
+4. Review and edit every fact, add rules such as "never discuss salary", and choose a 3D avatar. Nothing is shared until you approve it.
+5. Share a link, or paste one script tag into your own site.
+
+Status: invite-only beta. New members are admitted from the waitlist a few at a time.
+
+## Safety and honesty
+
+- Always labelled AI: the launcher button, the panel and the first answer say it is an AI version of the owner, and it says so whenever asked whether it is human.
+- Facts come only from the owner's profile. Its instructions forbid inventing employers, dates, numbers, salaries or commitments.
+- Messages are screened for prompt injection before they reach the model, and answers stay on the owner's work.
+- It runs only on websites the owner lists.
+- The owner can pause it at any time and delete their content.
+- Openfolio Cloud does not save recordings or transcripts. Visitors get no cookies or trackers.
+- Calls have time limits, turn limits and per-network rate limits.
+
+## Pricing
+
+- Openfolio Cloud is free during the invite-only beta.
+- Founding members: people who join the waitlist during the beta get free monthly credits.
+- Contributors: people whose pull requests are merged get extra credits.
+- Stars, upvotes, likes and follows are never rewarded.
+- Self-hosting is free under Apache-2.0. You pay your own AI providers, or nothing with local models.
+
+## Technology
+
+- Server: Python with FastAPI and Pipecat (a real-time voice pipeline) over WebRTC. No GPU is needed, because the 3D face renders in the visitor's browser.
+- Widget: a TypeScript web component (<openfolio-agent>) using three.js, TalkingHead and HeadAudio lip-sync. The loader script is about 11 KB (4 KB gzipped) and loads the rest only when a visitor opens it. Shadow DOM keeps the host site's CSS untouched.
+- Providers: any OpenAI-compatible language model (OpenAI, Groq, OpenRouter, Ollama, vLLM); Deepgram or local Whisper for speech-to-text; Kokoro (free, runs on CPU) or ElevenLabs for the voice.
+- Embed code: <script src="https://YOUR-SERVER/embed/embed.js" data-persona="you" async></script>
+
+## Limits
+
+- AI can be wrong. Owners should review their profile, and visitors should confirm important details (dates, offers, availability) with the person.
+- Voice needs microphone permission; text chat does not.
+- Openfolio Cloud is a beta run by one person, so features may change.
+
+## Frequently asked questions
+
+{% for f in faq %}
+### {{ f.question }}
+
+{{ f.answer }}
+
+{% endfor %}
+## Links
+
+- Website: {{ public_url }}/
+- Source code: {{ github_url }}
+{% for a in articles %}
+- {{ a.crumb }}: {{ public_url }}{{ a.path }}
+{% endfor %}
+{% if contact_email %}
+- Contact: {{ contact_email }}
+{% endif %}
+- Founder: Faisal Rehman

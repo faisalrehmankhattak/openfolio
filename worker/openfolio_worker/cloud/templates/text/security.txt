@@ -1,0 +1,9 @@
+# Openfolio Cloud. Please report vulnerabilities privately, not in public issues.
+{% if contact_email %}
+Contact: mailto:{{ contact_email }}
+{% endif %}
+Contact: {{ github_url }}/security/advisories/new
+Expires: {{ expires }}
+Preferred-Languages: en
+Canonical: {{ public_url }}/.well-known/security.txt
+Policy: {{ github_url }}/blob/main/SECURITY.md

@@ -1,0 +1,58 @@
+{% extends "article.html" %}
+{% block kicker %}Compare{% endblock %}
+{% block lead %}Three ways to put your work in front of recruiters and clients, compared by category rather than by brand.{% endblock %}
+{% block answer %}
+<p>A <strong>static portfolio site</strong> shows your work. A <strong>generic chatbot widget</strong> answers questions but isn't built around you. An <strong>AI portfolio</strong> such as Openfolio combines the two: your portfolio plus an AI version of you that answers only from what you wrote, by voice or chat, and is always labelled AI.</p>
+{% endblock %}
+{% block body %}
+<h2 id="table">Side by side</h2>
+<div class="table-scroll" role="region" aria-labelledby="compare-caption" tabindex="0">
+  <table class="compare">
+    <caption id="compare-caption">Static portfolio site, generic chatbot widget and Openfolio compared</caption>
+    <thead>
+      <tr>
+        <th scope="col"><span class="sr-only">Category</span></th>
+        <th scope="col">Static portfolio site</th>
+        <th scope="col">Generic chatbot widget</th>
+        <th scope="col" class="col-us">Openfolio (AI portfolio)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><th scope="row">Answers visitors' questions</th><td>No; visitors read and search the pages</td><td>Yes, usually by text</td><td class="col-us">Yes, by voice or chat</td></tr>
+      <tr><th scope="row">Where answers come from</th><td>Whatever is on the page</td><td>Depends on setup; often a general model plus your documents</td><td class="col-us">Only the profile you write and approve</td></tr>
+      <tr><th scope="row">When it doesn't know</th><td>Not applicable</td><td>Varies by product</td><td class="col-us">Says so and offers to take a message for you</td></tr>
+      <tr><th scope="row">A face and a voice</th><td>No</td><td>Usually text only</td><td class="col-us">A 3D avatar with lip-sync; text chat too</td></tr>
+      <tr><th scope="row">Labelled as AI</th><td>Not applicable</td><td>Varies</td><td class="col-us">Always: on the button, the panel and the first answer</td></tr>
+      <tr><th scope="row">Built for portfolios and hiring</th><td>Yes</td><td>Usually built for support or sales</td><td class="col-us">Yes</td></tr>
+      <tr><th scope="row">Setup</th><td>Build it or use a site builder</td><td>Configure the bot and its knowledge</td><td class="col-us">Upload your résumé, review the draft, share a link or paste one line</td></tr>
+      <tr><th scope="row">Works with your existing site</th><td>It is your site</td><td>Usually, with a script</td><td class="col-us">Yes, one script tag, or a shareable link</td></tr>
+      <tr><th scope="row">Open source and self-hostable</th><td>Depends on the tool</td><td>Varies</td><td class="col-us">Yes, Apache-2.0, no GPU needed</td></tr>
+      <tr><th scope="row">Cost</th><td>Hosting or a builder subscription</td><td>Varies; often per seat or per conversation</td><td class="col-us">Free during the beta; self-hosting is free (you pay your AI providers)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2 id="static">When a static portfolio site is enough</h2>
+<ul>
+  <li>Your work explains itself visually, and visitors rarely have follow-up questions.</li>
+  <li>You want full control of every pixel and no AI at all.</li>
+  <li>You are early in your career and still building material. Start here either way: an AI portfolio needs good material to draw on.</li>
+</ul>
+
+<h2 id="chatbot">When a generic chatbot widget fits</h2>
+<ul>
+  <li>You run a business site and need answers about products, orders or support.</li>
+  <li>You have a team to configure and monitor it.</li>
+</ul>
+
+<h2 id="ai-portfolio">When an AI portfolio is the better choice</h2>
+<ul class="checks">
+  <li>Recruiters or clients visit your site to decide whether to talk to you.</li>
+  <li>Your work has context worth explaining: decisions, trade-offs and results.</li>
+  <li>You want to be reachable across time zones without being always on.</li>
+  <li>You want an AI that speaks for you only from your own words, and always says it's an AI.</li>
+</ul>
+
+<h2 id="together">Use them together</h2>
+<p>An AI portfolio doesn't replace your site. Openfolio adds a 3D AI version of you on top of the portfolio you already have, with one script tag, or gives you a shareable link if you don't have a site yet.</p>
+{% endblock %}
