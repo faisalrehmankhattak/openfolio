@@ -179,7 +179,7 @@ def accounts_router(ctx: CloudContext, members: MemberAuth) -> APIRouter:
             )
             return again(409)
         await db.run(db.audit, "user.created", now=now, ip_hash=ctx.ip_hash(request), user_id=user.id)
-        response = RedirectResponse("/studio/setup?welcome=1", status_code=303)
+        response = RedirectResponse("/studio/setup?m=welcome", status_code=303)
         await members.sign_in(response, user)
         return response
 

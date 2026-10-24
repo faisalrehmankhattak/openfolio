@@ -44,7 +44,7 @@ def test_signup_with_a_real_approval_creates_the_account_and_uses_the_invite(clo
     assert 'value="jane-doe"' in page.text  # suggested from the name
     r = post_join(client, token, handle="jane")
     assert r.status_code == 303
-    assert r.headers["location"] == "/studio/setup?welcome=1"
+    assert r.headers["location"] == "/studio/setup?m=welcome"  # the welcome note shows on the first visit
     cookie = r.headers["set-cookie"]
     assert "openfolio_session=" in cookie
     assert "HttpOnly" in cookie
