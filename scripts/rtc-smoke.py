@@ -9,7 +9,7 @@ if sys.argv[1] == 'server':
     import uvicorn
     import openfolio_worker.server as server
     os.environ.update(OPENFOLIO_SKIP_CHECKS='1',LLM_MODEL='smoke',LLM_API_KEY='smoke',DEEPGRAM_API_KEY='smoke')
-    async def fake_conversation(connection, *args):
+    async def fake_conversation(connection, *args, **kwargs):
         connection.replace_audio_track(AudioStreamTrack())
         @connection.event_handler('app-message')
         async def echo(conn, message):
