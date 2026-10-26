@@ -170,6 +170,26 @@ The injection screen is a regular expression, not a classifier, and the system p
 
 Found a vulnerability? Please report it privately as described in [SECURITY.md](SECURITY.md) (email or [GitHub security advisories](https://github.com/faisalrehmankhattak/openfolio/security/advisories/new)), not in a public issue.
 
+## Cost limits
+
+Openfolio meters every call and every Studio draft, and stops before your bill grows. Defaults keep a public demo near **$50 a month**:
+
+| Cap | Default | Setting |
+|---|---|---|
+| Monthly budget | $50 | `MONTHLY_BUDGET_USD` |
+| Daily budget | a fifteenth of the monthly budget | `DAILY_BUDGET_USD` |
+| One call | 10 minutes, 30 replies | `SESSION_MAX_MINUTES`, `SESSION_MAX_REPLIES` |
+| One visitor | 10 calls a day | `VISITOR_CALLS_PER_DAY` |
+| One persona | 120 call minutes a day | `PERSONA_MINUTES_PER_DAY` |
+| Whole server | 240 min a day, 3,000 a month | `DAILY_MAX_MINUTES`, `MONTHLY_MAX_MINUTES` |
+| Model tokens | 2M a day, 30M a month | `DAILY_MAX_LLM_TOKENS`, `MONTHLY_MAX_LLM_TOKENS` |
+| Paid voice characters | 100k a day, 1M a month | `DAILY_MAX_TTS_CHARS`, `MONTHLY_MAX_TTS_CHARS` |
+
+- Spending is an estimate from the `PRICE_*` settings; set them to your providers' prices. The minute and token caps hold even if a price is wrong.
+- At a cap, new calls are refused with a clear message and calls in progress end politely. Calls already running can overshoot by at most `MAX_SESSIONS` × `SESSION_MAX_MINUTES`.
+- Totals are kept per UTC day in `DATA_DIR/usage.db` and survive restarts. Visitors are counted by a salted hash, never their IP address.
+- Check spending with `uv run openfolio-usage`; `/healthz` reports `usage_limit` while calls are being refused.
+
 ## Configuration
 
 All settings live in `.env` (see [`.env.example`](.env.example)).

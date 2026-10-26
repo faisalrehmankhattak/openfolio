@@ -42,7 +42,7 @@
   </nav>
   <div class="studio-content">
     {% if message %}
-    <div class="toast{% if message_code in ('incomplete', 'draft_limit', 'no_sources', 'draft_running') %} toast-warn{% endif %}" role="status">{{ icon("check" if message_code not in ('incomplete', 'draft_limit', 'no_sources', 'draft_running') else "alert", 18) }}<p>{{ message }}</p></div>
+    <div class="toast{% if message_code in ('incomplete', 'draft_limit', 'usage_limit', 'no_sources', 'draft_running') %} toast-warn{% endif %}" role="status">{{ icon("check" if message_code not in ('incomplete', 'draft_limit', 'no_sources', 'draft_running') else "alert", 18) }}<p>{{ message }}</p></div>
     {% endif %}
     {% block content %}{% endblock %}
   </div>

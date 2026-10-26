@@ -336,3 +336,34 @@ def test_a_draft_lost_in_a_restart_shows_as_interrupted(cloud_settings):
     # An hour later it is forgotten.
     restarted.state.cloud.clock = lambda: time.time() + 3700
     assert client.get("/studio/draft/status").json() == {"state": "none"}
+
+
+def test_each_answered_request_reports_its_token_usage(settings):
+    seen = []
+
+    def llm(request):
+        body = json.loads(request.content)
+        if body.get("response_format", {}).get("type") == "json_schema":
+            return httpx.Response(
+                400,
+                json={
+                    "error": {"message": "response_format json_schema not supported"},
+                    "usage": {"prompt_tokens": 7, "completion_tokens": 0},
+                },
+            )
+        reply = completion(json.dumps({"name": "Ada Quist", "title": "Staff Robotics Engineer"}))
+        payload = reply.json()
+        payload["usage"] = {"prompt_tokens": 900, "completion_tokens": 120}
+        return httpx.Response(200, json=payload)
+
+    asyncio.run(draft_profile(settings, DOC, httpx.MockTransport(llm), on_usage=lambda p, c: seen.append((p, c))))
+    assert seen == [(7, 0), (900, 120)]
+
+
+def test_missing_usage_figures_are_ignored(settings):
+    seen = []
+    reply = completion(json.dumps({"name": "Ada Quist"}))
+    asyncio.run(
+        draft_profile(settings, DOC, httpx.MockTransport(lambda _: reply), on_usage=lambda p, c: seen.append((p, c)))
+    )
+    assert seen in ([], [(0, 0)])

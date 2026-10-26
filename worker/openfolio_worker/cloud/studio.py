@@ -60,6 +60,7 @@ MESSAGES = {
     "password": "Password changed. Other devices are signed out.",
     "draft_running": "A draft is already being written.",
     "draft_limit": "You've drafted several times in a short while. Please try again later.",
+    "usage_limit": "Drafting is paused because the service reached its usage limit. Please try again later.",
     "no_sources": "Add a document or paste some text first.",
 }
 

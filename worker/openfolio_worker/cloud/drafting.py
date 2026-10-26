@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import secrets
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
@@ -262,6 +263,14 @@ def build_messages(sources: list[Source]) -> list[dict[str, str]]:
     ]
 
 
+def _report_usage(r: httpx.Response, on_usage: Callable[[int, int], None]) -> None:
+    try:
+        used = r.json().get("usage") or {}
+        on_usage(int(used.get("prompt_tokens") or 0), int(used.get("completion_tokens") or 0))
+    except (ValueError, AttributeError, TypeError):
+        pass  # a provider without usage figures; the minute and budget caps still apply to calls
+
+
 def _parse(content: str) -> Draft:
     text = content.strip()
     if text.startswith("\x60\x60\x60"):  # a fenced block from models that ignore the JSON mode
@@ -281,7 +290,10 @@ _FORMATS: tuple[dict[str, Any] | None, ...] = (
 
 
 async def draft_profile(
-    settings: Settings, sources: list[Source], transport: httpx.AsyncBaseTransport | None = None
+    settings: Settings,
+    sources: list[Source],
+    transport: httpx.AsyncBaseTransport | None = None,
+    on_usage: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
     """Ask the configured OpenAI-compatible LLM for a draft and return cleaned persona fields."""
     if not settings.llm_model or not (settings.llm_api_key or settings.llm_is_local):
@@ -306,6 +318,8 @@ async def draft_profile(
             except httpx.HTTPError as e:
                 logger.warning(f"Draft request failed ({type(e).__name__})")
                 raise DraftError("We couldn't reach the AI. Please try again in a minute.") from e
+            if on_usage:
+                _report_usage(r, on_usage)  # every answered request costs, refused formats included
             if r.status_code == 400 and response_format and any(w in r.text for w in _FORMAT_WORDS):
                 # Older or local models without structured outputs: fall back to a looser JSON mode.
                 logger.info(f"LLM refused response_format {response_format['type']}; trying a looser mode")

@@ -42,6 +42,7 @@ Issues = "https://github.com/faisalrehmankhattak/openfolio/issues"
 whisper = ["pipecat-ai[whisper]==1.13.0"]
 
 [project.scripts]
+openfolio-usage = "openfolio_worker.usage:main"
 openfolio-worker = "openfolio_worker.server:main"
 openfolio-doctor = "openfolio_worker.doctor:main"
 openfolio-schema = "openfolio_worker.persona:main"

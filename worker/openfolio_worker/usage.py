@@ -178,3 +178,26 @@ class UsageLedger:
             period: {metric: round(self.total(SERVER, metric, period), 4) for metric in METRICS}
             for period in ("day", "month")
         }
+
+
+def main() -> None:
+    """openfolio-usage: today's and this month's spending against the caps."""
+    from dataclasses import asdict
+
+    from .config import load_settings
+
+    settings = load_settings()
+    ledger = UsageLedger(settings.data_dir / "usage.db", settings.limits)
+    lim = settings.limits
+    summary = ledger.summary()
+    for period, budget, minutes in (
+        ("day", lim.daily_budget_usd, lim.daily_max_minutes),
+        ("month", lim.monthly_budget_usd, lim.monthly_max_minutes),
+    ):
+        s = summary[period]
+        print(
+            f"{period:>5}: ${s['cost_usd']:.2f} of ${budget:.2f}, {s['seconds'] / 60:.0f} of {minutes} min,"
+            f" {s['calls']:.0f} calls, {s['llm_in'] + s['llm_out']:.0f} tokens"
+        )
+    print("limit: " + (ledger.server_cap() or "none reached"))
+    print("caps:  " + ", ".join(f"{k}={v}" for k, v in asdict(lim).items()))

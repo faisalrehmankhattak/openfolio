@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from loguru import logger
 from starlette.datastructures import UploadFile
 
+from ..usage import UsageLedger
 from .drafting import DraftError, Source, draft_profile
 from .member_auth import SignedIn
 from .profile import find_flags, photo_path
@@ -298,11 +299,18 @@ def add_setup_routes(router: APIRouter, studio: Studio) -> None:
         )
         return RedirectResponse("/studio/setup?m=pasted#documents", status_code=303)
 
-    async def run_draft(job: DraftJob, signed: SignedIn, sources: list[Source], ip_hash: str) -> None:
+    async def run_draft(
+        job: DraftJob, signed: SignedIn, sources: list[Source], ip_hash: str, usage: UsageLedger | None
+    ) -> None:
         user = signed.user
+
+        def count(prompt_tokens: int, completion_tokens: int) -> None:
+            if usage:
+                usage.add_llm(user.handle, None, prompt_tokens, completion_tokens)
+
         try:
             job.step = "drafting"
-            fields = await draft_profile(ctx.settings, sources, ctx.transport)
+            fields = await draft_profile(ctx.settings, sources, ctx.transport, on_usage=count)
             job.step = "checking"
             record = await studio.record(signed)
             merged = {**record.data, **{k: fields[k] for k in DRAFT_KEYS if k in fields}}
@@ -342,6 +350,9 @@ def add_setup_routes(router: APIRouter, studio: Studio) -> None:
         recent_day = await db.run(db.actions_since, "draft.started", now - 86_400, user_id=user.id)
         if recent_hour >= DRAFTS_PER_HOUR or recent_day >= DRAFTS_PER_DAY:
             return RedirectResponse("/studio/setup?m=draft_limit", status_code=303)
+        usage: UsageLedger | None = getattr(request.app.state, "usage", None)
+        if usage and usage.server_cap():
+            return RedirectResponse("/studio/setup?m=usage_limit", status_code=303)
         documents = await db.run(store.list_files, user.id, "document")
         sources = [Source(f.original_name, f.text) for f in documents if f.text.strip()]
         if not sources:
@@ -350,7 +361,7 @@ def add_setup_routes(router: APIRouter, studio: Studio) -> None:
         await db.run(db.audit, "draft.started", now=now, ip_hash=ip_hash, user_id=user.id)
         job = DraftJob()
         jobs[user.id] = job
-        job.task = asyncio.create_task(run_draft(job, signed, sources, ip_hash))
+        job.task = asyncio.create_task(run_draft(job, signed, sources, ip_hash, usage))
         return RedirectResponse("/studio/setup#draft", status_code=303)
 
     @router.get("/studio/draft/status")
