@@ -9,7 +9,6 @@ embed/dist
 avatars/*
 !avatars/LICENSE-readyplayerme.txt
 !avatars/demo-portrait.jpg
-!avatars/faisal-photo.jpg
 data
 .transfer-done
 .railway

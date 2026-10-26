@@ -8,6 +8,7 @@ from openfolio_worker.config import CloudSettings
 from openfolio_worker.server import create_app
 
 from cloud_helpers import VALID, client_for, rows, submit
+from conftest import CONTACT_EMAIL
 
 CLOUD_PATHS = [
     "/privacy",
@@ -42,7 +43,7 @@ def test_landing_page(cloud_settings):
     assert r.status_code == 200
     html = r.text
     assert "Your portfolio, <span" in html
-    assert '<script src="/embed/embed.js" data-persona="faisal"' in html
+    assert '<script src="/embed/embed.js" data-persona="demo"' in html
     assert 'action="/cloud/requests#request"' in html
     assert 'href="/privacy"' in html
     assert 'href="/terms"' in html
@@ -204,21 +205,22 @@ def test_form_body_limits(cloud_settings):
 def test_privacy_and_terms(cloud_settings, persona):
     client = client_for(cloud_settings)
     privacy = client.get("/privacy").text
-    for text in ("Beta.", "hash", "90 days", "30 days", "README", persona.email):
+    for text in ("Beta.", "hash", "90 days", "30 days", "README", CONTACT_EMAIL):
         assert text in privacy
+    assert persona.email not in privacy  # the demo persona's address is fictional
     terms = client.get("/terms").text
     assert "Beta." in terms
-    assert persona.email in terms
+    assert CONTACT_EMAIL in terms
 
 
 def test_public_url_may_run_every_persona(cloud_settings):
     origin = {"origin": cloud_settings.cloud.public_url}
     client = client_for(cloud_settings)
-    assert client.get("/v1/personas/faisal/ice-servers", headers=origin).status_code == 200
-    preflight = client.options("/v1/personas/faisal/offer", headers={**origin, "access-control-request-method": "POST"})
+    assert client.get("/v1/personas/demo/ice-servers", headers=origin).status_code == 200
+    preflight = client.options("/v1/personas/demo/offer", headers={**origin, "access-control-request-method": "POST"})
     assert preflight.headers["access-control-allow-origin"] == origin["origin"]
     other = {"origin": "https://evil.example"}
-    assert client.get("/v1/personas/faisal/ice-servers", headers=other).status_code == 403
+    assert client.get("/v1/personas/demo/ice-servers", headers=other).status_code == 403
 
 
 def test_not_found_pages(cloud_settings):

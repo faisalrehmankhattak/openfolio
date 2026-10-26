@@ -15,11 +15,11 @@ s = load_settings()
 assert s.personas_dir == Path("/app/personas")
 assert s.inbox_dir == Path("/app/data/inbox")
 with TestClient(create_app(s)) as client:
-    for url in ("/", "/embed/embed.js", "/embed/app.js", "/avatars/demo.glb", "/v1/personas/faisal", "/livez"):
+    for url in ("/", "/embed/embed.js", "/embed/app.js", "/avatars/demo.glb", "/v1/personas/demo", "/livez"):
         response = client.get(url)
         assert response.status_code == 200, (url, response.status_code)
     # Without provider keys the server must refuse calls up front, before WebRTC starts.
-    ice = client.get("/v1/personas/faisal/ice-servers", headers={"origin": "http://localhost:7860"})
+    ice = client.get("/v1/personas/demo/ice-servers", headers={"origin": "http://localhost:7860"})
     assert ice.status_code == 503 and "not configured" in ice.text, (ice.status_code, ice.text)
     assert client.get("/healthz").status_code == 503
 Path("/app/data/inbox/.smoke").write_text("ok")

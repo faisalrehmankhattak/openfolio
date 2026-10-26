@@ -19,8 +19,8 @@ def test_question_selects_card(text, card):
 
 
 def test_naming_a_project_shows_projects(persona):
-    assert card_for("Tell me about Countify", persona) == "projects"
-    assert card_for("Tell me about Countify") is None
+    assert card_for("Tell me about Fieldnote", persona) == "projects"
+    assert card_for("Tell me about Fieldnote") is None
 
 
 def test_card_data_is_json_ready(persona):

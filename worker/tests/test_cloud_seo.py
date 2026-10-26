@@ -13,7 +13,7 @@ from openfolio_worker.cloud.github import CACHE_SECONDS, RETRY_SECONDS, StarCoun
 from openfolio_worker.config import ConfigError, load_settings
 
 from cloud_helpers import client_for
-from conftest import PUBLIC_URL
+from conftest import CONTACT_EMAIL, PUBLIC_URL
 
 PRIVATE = ("/admin", "/studio", "/join", "/login", "/invite", "/cloud/")
 SITEMAP_NS = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
@@ -148,7 +148,7 @@ def test_security_txt(cloud_settings, persona):
     client.app.state.cloud.clock = lambda: 1_790_000_000  # 2026-09-21
     r = client.get("/.well-known/security.txt")
     assert r.status_code == 200
-    assert f"Contact: mailto:{persona.email}" in r.text
+    assert f"Contact: mailto:{CONTACT_EMAIL}" in r.text
     assert "Expires: 2027-09-21T" in r.text
     assert f"Canonical: {PUBLIC_URL}/.well-known/security.txt" in r.text
     fields = [line.split(":", 1)[0] for line in r.text.splitlines() if line and not line.startswith("#")]

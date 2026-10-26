@@ -128,8 +128,8 @@ def test_live_personas_are_callable_until_paused_or_deleted(cloud_settings):
 def test_members_cannot_shadow_file_personas(cloud_settings):
     app = app_for(cloud_settings)
     registry = app.state.cloud.registry
-    registry.replace_live({"faisal": registry.files["faisal"].model_copy(update={"name": "Impostor"})})
-    assert browser(app).get("/v1/personas/faisal").json()["name"] != "Impostor"
+    registry.replace_live({"demo": registry.files["demo"].model_copy(update={"name": "Impostor"})})
+    assert browser(app).get("/v1/personas/demo").json()["name"] != "Impostor"
 
 
 # The public page

@@ -18,7 +18,7 @@ def test_message_is_saved_cleaned_and_confirmed(persona, tmp_path):
     res = SessionResources(persona=persona, inbox_dir=tmp_path, session_id="s1")
     result, params = _call(res, visitor_name="Ada\x00", visitor_email="ada@example.com", message="Let's talk")
     assert result == {"saved": True}
-    entry = json.loads((tmp_path / "faisal.jsonl").read_text())
+    entry = json.loads((tmp_path / "demo.jsonl").read_text())
     assert entry["name"] == "Ada"
     assert entry["message"] == "Let's talk"
     assert params.llm.push_frame.call_args.args[0].data["card"] == "message_sent"
@@ -28,7 +28,7 @@ def test_invalid_email_is_refused(persona, tmp_path):
     res = SessionResources(persona=persona, inbox_dir=tmp_path, session_id="s1")
     result, _ = _call(res, visitor_name="Ada", visitor_email="nope", message="hi")
     assert result["saved"] is False
-    assert not (tmp_path / "faisal.jsonl").exists()
+    assert not (tmp_path / "demo.jsonl").exists()
 
 
 def test_messages_per_call_are_capped(persona, tmp_path):
@@ -37,4 +37,4 @@ def test_messages_per_call_are_capped(persona, tmp_path):
         _call(res, visitor_name="A", visitor_email="a@example.com", message="hi")
     result, _ = _call(res, visitor_name="A", visitor_email="a@example.com", message="hi")
     assert result["saved"] is False
-    assert len((tmp_path / "faisal.jsonl").read_text().splitlines()) == 2
+    assert len((tmp_path / "demo.jsonl").read_text().splitlines()) == 2

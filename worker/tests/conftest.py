@@ -43,7 +43,8 @@ from openfolio_worker.config import CloudSettings, Settings, load_settings  # no
 from openfolio_worker.persona import Persona, load_personas  # noqa: E402
 
 PERSONAS = Path(__file__).resolve().parents[2] / "personas"
-ORIGIN = {"origin": "https://faisalrehmanktk.com"}
+ORIGIN = {"origin": "https://example.com"}
+CONTACT_EMAIL = "owner@example.org"  # the cloud owner, not the fictional demo persona
 PUBLIC_URL = "http://127.0.0.1:7872"
 ADMIN_PASSWORD = "correct horse battery staple"
 ADMIN_HASH = hash_password(ADMIN_PASSWORD, n=2**10)  # cheap scrypt parameters keep the suite fast
@@ -59,7 +60,12 @@ def settings() -> Settings:
 @pytest.fixture
 def cloud_settings(settings: Settings, tmp_path: Path) -> Settings:
     """CLOUD_MODE on, with a temporary DATA_DIR."""
-    cloud = CloudSettings(public_url=PUBLIC_URL, session_secret=SESSION_SECRET, admin_password_hash=ADMIN_HASH)
+    cloud = CloudSettings(
+        public_url=PUBLIC_URL,
+        session_secret=SESSION_SECRET,
+        admin_password_hash=ADMIN_HASH,
+        contact_email=CONTACT_EMAIL,
+    )
     return replace(settings, data_dir=tmp_path, inbox_dir=tmp_path / "inbox", cloud=cloud)
 
 
@@ -76,4 +82,4 @@ def _cheap_member_passwords(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def persona() -> Persona:
-    return load_personas(PERSONAS)["faisal"]
+    return load_personas(PERSONAS)["demo"]

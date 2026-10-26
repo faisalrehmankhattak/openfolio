@@ -8,20 +8,20 @@ from conftest import PERSONAS
 
 
 def _raw() -> dict:
-    return json.loads((PERSONAS / "faisal.json").read_text())
+    return json.loads((PERSONAS / "demo.json").read_text())
 
 
 def test_personas_load(persona):
-    assert persona.first_name == "Faisal"
-    assert persona.origins == {"https://faisalrehmanktk.com", "https://www.faisalrehmanktk.com"}
+    assert persona.first_name == "Avery"
+    assert persona.origins == {"https://example.com"}
 
 
 def test_prompt_carries_rules_then_facts(persona):
     prompt = build_system_prompt(persona)
-    assert "AI version of Faisal" in prompt
-    assert "Never name restaurant brands" in prompt
-    assert "low 70s to over 90%" in prompt
-    assert prompt.index("# Honesty") < prompt.index("# About Faisal")
+    assert "AI version of Avery" in prompt
+    assert "fictional demo character" in prompt
+    assert "600 scripted conversations" in prompt
+    assert prompt.index("# Honesty") < prompt.index("# About Avery")
     assert "- - " not in prompt
 
 

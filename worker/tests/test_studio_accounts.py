@@ -116,7 +116,7 @@ def test_join_shows_field_errors_and_keeps_the_invite(app, cloud_settings):
     assert r.status_code == 400
     assert "That handle is taken" in r.text
     assert "Use at least 12 characters." in r.text
-    r = post_join(client, token, handle="faisal")
+    r = post_join(client, token, handle="demo")
     assert r.status_code == 400  # the file persona's id is reserved
     join(app, cloud_settings, handle="taken")
     r = post_join(client, token, handle="taken")

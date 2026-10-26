@@ -141,7 +141,8 @@ class CloudContext:
 
     @property
     def contact_email(self) -> str | None:
-        return (self.demo.email if self.demo else None) or self.mailer.notify_email
+        # Not the demo persona's address: that one is fictional.
+        return self.cloud.contact_email or self.mailer.notify_email
 
     @property
     def landing_csp(self) -> str:

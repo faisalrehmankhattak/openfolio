@@ -42,7 +42,7 @@ from .bot import run_conversation
 from .config import ROOT, Settings, load_settings
 from .doctor import run_checks
 from .ice import IceProvider
-from .persona import Persona, load_personas
+from .persona import Persona, load_persona_dirs
 from .registry import PREVIEW_SUFFIX, PersonaRegistry
 
 if TYPE_CHECKING:
@@ -125,7 +125,7 @@ async def read_json(request: Request, model: type[BaseModel]) -> Any:
 def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTransport | None = None) -> FastAPI:
     """Build the server. transport replaces the network for outbound HTTP (Cloudflare) in tests."""
     settings = settings or load_settings()
-    registry = PersonaRegistry(load_personas(settings.personas_dir))
+    registry = PersonaRegistry(load_persona_dirs(settings.personas_dir, settings.private_personas_dir))
     handler = SmallWebRTCRequestHandler(ice_servers=[IceServer(**s) for s in settings.ice_servers] or None)
     ice = IceProvider(settings, transport)
     active: dict[str, asyncio.Task[None]] = {}

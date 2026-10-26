@@ -6,5 +6,9 @@ __pycache__/
 node_modules/
 embed/dist/
 avatars/*.glb
+# Your own personas and photos stay private: only the fictional demo persona is published.
+personas/*
+!personas/demo.json
+avatars/*-photo.*
 data/
 .DS_Store

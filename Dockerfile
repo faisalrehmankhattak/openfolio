@@ -25,7 +25,7 @@ WORKDIR /app
 COPY personas/ ./personas/
 COPY demo/ ./demo/
 COPY LICENSE NOTICE ./
-COPY avatars/LICENSE-readyplayerme.txt avatars/demo-portrait.jpg avatars/faisal-photo.jpg ./avatars/
+COPY avatars/LICENSE-readyplayerme.txt avatars/demo-portrait.jpg ./avatars/
 COPY --from=avatar /avatars/ ./avatars/
 COPY --from=widget /build/embed/dist/ ./embed/dist/
 # /data is where Railway (and other hosts) mount a volume; set DATA_DIR=/data to use it.

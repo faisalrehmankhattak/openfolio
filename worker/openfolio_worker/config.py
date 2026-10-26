@@ -96,7 +96,8 @@ class CloudSettings:
     public_url: str  # bare origin without a trailing slash, e.g. https://openfolio.up.railway.app
     session_secret: str = field(repr=False)
     admin_password_hash: str = field(repr=False)
-    demo_persona: str = "faisal"
+    demo_persona: str = "demo"  # the fictional Avery Quinn shipped in personas/demo.json
+    contact_email: str | None = None  # privacy page and security.txt; falls back to NOTIFY_EMAIL
     turnstile_site_key: str | None = None
     turnstile_secret_key: str | None = field(default=None, repr=False)
     smtp: SmtpSettings | None = None
@@ -135,6 +136,13 @@ def _product_hunt_url() -> str | None:
     if parts.scheme != "https" or not (host == "producthunt.com" or host.endswith(".producthunt.com")):
         raise ConfigError(f"PRODUCT_HUNT_URL must be an https://www.producthunt.com/ link, got {raw!r}")
     return raw
+
+
+def _contact_email() -> str | None:
+    email = _str("CONTACT_EMAIL")
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise ConfigError("CONTACT_EMAIL must be an email address")
+    return email
 
 
 def _github_repo() -> str | None:
@@ -191,7 +199,8 @@ def _cloud_settings() -> CloudSettings | None:
         public_url=_public_url(),
         session_secret=secret,
         admin_password_hash=password_hash,
-        demo_persona=_str("CLOUD_DEMO_PERSONA") or "faisal",
+        demo_persona=_str("CLOUD_DEMO_PERSONA") or "demo",
+        contact_email=_contact_email(),
         turnstile_site_key=site_key,
         turnstile_secret_key=secret_key,
         smtp=_smtp(),
@@ -247,6 +256,8 @@ class Settings:
     cloudflare_turn_key_id: str | None = None
     cloudflare_turn_api_token: str | None = field(default=None, repr=False)
     data_dir: Path = ROOT / "data"
+    # Personas kept outside the repo (for example on a server volume); loaded alongside personas_dir.
+    private_personas_dir: Path | None = None
     cloud: CloudSettings | None = None  # None unless CLOUD_MODE=1; self-hosted servers never see the cloud pages
 
     @property
@@ -292,6 +303,7 @@ def load_settings() -> Settings:
     cloudflare_key_id, cloudflare_token = _cloudflare_turn(turn_provider)
     return Settings(
         personas_dir=Path(os.getenv("PERSONAS_DIR", ROOT / "personas")),
+        private_personas_dir=Path(p) if (p := _str("PRIVATE_PERSONAS_DIR")) else None,
         inbox_dir=Path(os.getenv("INBOX_DIR", data_dir / "inbox")),
         embed_dir=Path(os.getenv("EMBED_DIR", ROOT / "embed" / "dist")),
         avatars_dir=Path(os.getenv("AVATARS_DIR", ROOT / "avatars")),

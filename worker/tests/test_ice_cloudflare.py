@@ -67,9 +67,7 @@ def logs():
 
 def test_browser_gets_cloudflare_servers_without_port_53(cf_settings):
     cf = FakeCloudflare()
-    r = TestClient(create_app(cf_settings, transport=cf.transport)).get(
-        "/v1/personas/faisal/ice-servers", headers=ORIGIN
-    )
+    r = TestClient(create_app(cf_settings, transport=cf.transport)).get("/v1/personas/demo/ice-servers", headers=ORIGIN)
     assert r.status_code == 200
     servers = r.json()["iceServers"]
     urls = [u for s in servers for u in s["urls"]]
@@ -142,7 +140,7 @@ def test_offer_gives_the_worker_cloudflare_relay(cf_settings, monkeypatch):
 
     monkeypatch.setattr("openfolio_worker.server.SmallWebRTCRequestHandler.handle_web_request", answer)
     client = TestClient(create_app(cf_settings, transport=FakeCloudflare().transport))
-    r = client.post("/v1/personas/faisal/offer", json={"sdp": "x", "type": "offer"}, headers=ORIGIN)
+    r = client.post("/v1/personas/demo/offer", json={"sdp": "x", "type": "offer"}, headers=ORIGIN)
     assert r.status_code == 200
     (servers,) = seen
     assert any(

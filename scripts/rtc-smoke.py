@@ -22,7 +22,7 @@ else:
     import httpx
     async def main():
         async with httpx.AsyncClient() as c:
-            response=await c.get('http://127.0.0.1:17862/v1/personas/faisal/ice-servers')
+            response=await c.get('http://127.0.0.1:17862/v1/personas/demo/ice-servers')
             response.raise_for_status()
             ice = [RTCIceServer(**s) for s in response.json()['iceServers']]
         pc=RTCPeerConnection(RTCConfiguration(iceServers=ice))
@@ -44,7 +44,7 @@ else:
         try:
             await pc.setLocalDescription(await pc.createOffer())
             async with httpx.AsyncClient(timeout=20) as c:
-                response=await c.post('http://127.0.0.1:17862/v1/personas/faisal/offer',json={'sdp':pc.localDescription.sdp,'type':'offer'})
+                response=await c.post('http://127.0.0.1:17862/v1/personas/demo/offer',json={'sdp':pc.localDescription.sdp,'type':'offer'})
                 response.raise_for_status(); answer=response.json()
             await pc.setRemoteDescription(RTCSessionDescription(sdp=answer['sdp'],type=answer['type']))
             await asyncio.wait_for(asyncio.gather(echoed.wait(),audio.wait()),20)

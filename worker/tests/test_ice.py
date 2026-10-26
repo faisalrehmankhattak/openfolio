@@ -23,7 +23,7 @@ def test_static_worker_credentials_never_reach_browser(settings):
         turn_urls=[],
         turn_shared_secret=None,
     )
-    r = TestClient(create_app(s)).get("/v1/personas/faisal/ice-servers")
+    r = TestClient(create_app(s)).get("/v1/personas/demo/ice-servers")
     assert r.status_code == 200
     assert r.json() == {"iceServers": [{"urls": ["stun:stun.example:3478"]}]}
     assert r.headers["cache-control"] == "no-store"

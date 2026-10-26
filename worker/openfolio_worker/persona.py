@@ -118,6 +118,19 @@ class PersonaError(ValueError):
     """A persona file is missing, malformed or inconsistent."""
 
 
+def load_persona_dirs(*directories: Path | None) -> dict[str, Persona]:
+    """Merge persona folders; an id defined twice is an error rather than a silent override."""
+    merged: dict[str, Persona] = {}
+    for directory in directories:
+        if directory is None:
+            continue
+        for persona_id, persona in load_personas(directory).items():
+            if persona_id in merged:
+                raise PersonaError(f"persona {persona_id!r} is defined in more than one folder")
+            merged[persona_id] = persona
+    return merged
+
+
 def load_personas(directory: Path) -> dict[str, Persona]:
     personas: dict[str, Persona] = {}
     for path in sorted(directory.glob("*.json")):

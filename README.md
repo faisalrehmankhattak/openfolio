@@ -16,7 +16,7 @@
 
 **[Try it on Openfolio Cloud](https://YOUR-OPENFOLIO-CLOUD-URL)** · [Run it yourself](#quick-start) · [Contribute and earn credits](#contribute-and-earn-credits)
 
-<img src=".github/assets/cloud-landing.png" alt="Openfolio Cloud: 'Your portfolio, alive.' with a live AI version of Faisal you can talk to or chat with" width="820">
+<img src=".github/assets/cloud-landing.png" alt="Openfolio Cloud: 'Your portfolio, alive.' with a live AI demo persona you can talk to or chat with" width="820">
 
 </div>
 
@@ -90,7 +90,7 @@ Check your provider settings without starting the server: `cd worker && uv run o
 
 ## Make it yours
 
-1. Copy `personas/faisal.json` to `personas/<you>.json` and set `"id": "<you>"`.
+1. Copy `personas/demo.json` (Avery Quinn, a fictional demo person) to `personas/<you>.json` and set `"id": "<you>"`. Everything in `personas/` except the demo is git-ignored, so your profile stays private.
 2. Fill in your story: `about`, `highlights`, `experience`, `projects`, `skills`, `links`, `email`.
 3. Add rules in `guardrails` (for example "Never discuss salary").
 4. List the sites allowed to embed you in `allowed_origins`.
@@ -227,7 +227,8 @@ Requests live in SQLite at `DATA_DIR/cloud.db`. IP addresses are stored only as 
 | `PUBLIC_URL` | The site's origin, such as `https://openfolio.up.railway.app` (https; `http://localhost` for development). Used in links, and allowed to run every persona so the demo works |
 | `SESSION_SECRET` | At least 32 random characters (`openssl rand -base64 48`). Signs sessions and salts IP hashes |
 | `ADMIN_PASSWORD_HASH` | Your admin password as an scrypt hash: `cd worker && uv run openfolio-admin-hash` |
-| `CLOUD_DEMO_PERSONA` | Persona in the landing page demo (default `faisal`) |
+| `CLOUD_DEMO_PERSONA` | Persona in the landing page demo (default `demo`, the fictional Avery Quinn) |
+| `CONTACT_EMAIL` | Contact address on the privacy page and in security.txt (defaults to `NOTIFY_EMAIL`) |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Optional bot check on the form; set both |
 | `GITHUB_REPO` | Optional `owner/name`; shows the repository's live star count, fetched server-side and cached for an hour |
 | `PRODUCT_HUNT_URL` | Optional Product Hunt link; shows a "we're live" banner on public pages while set |
