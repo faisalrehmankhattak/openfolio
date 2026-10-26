@@ -51,6 +51,65 @@ def _int(name: str, default: int, minimum: int = 0) -> int:
     return value
 
 
+def _float(name: str, default: float, minimum: float = 0.0) -> float:
+    raw = os.getenv(name, "").strip() or str(default)
+    try:
+        value = float(raw)
+    except ValueError as e:
+        raise ConfigError(f"{name} must be a number, got {raw!r}") from e
+    if value < minimum:
+        raise ConfigError(f"{name} must be at least {minimum}, got {value}")
+    return value
+
+
+@dataclass(frozen=True)
+class Limits:
+    """Spending and usage caps. 0 turns a cap off. Defaults keep a public demo near $50 a month.
+
+    Prices are estimates you set to match your providers; the minute and token caps hold even if
+    a price is wrong.
+    """
+
+    monthly_budget_usd: float = 50.0
+    daily_budget_usd: float = 50.0 / 15  # one bad day can spend at most a fifteenth of the month
+    session_max_minutes: int = 10
+    session_max_replies: int = 30
+    visitor_calls_per_day: int = 10
+    persona_minutes_per_day: int = 120
+    daily_max_minutes: int = 240
+    monthly_max_minutes: int = 3000
+    daily_max_llm_tokens: int = 2_000_000
+    monthly_max_llm_tokens: int = 30_000_000
+    daily_max_tts_chars: int = 100_000
+    monthly_max_tts_chars: int = 1_000_000
+    price_llm_input_per_mtok: float = 2.5
+    price_llm_output_per_mtok: float = 10.0
+    price_stt_per_minute: float = 0.0077
+    price_tts_per_mchar: float = 50.0  # charged only for a paid voice (ElevenLabs); Kokoro is free
+
+
+def _limits() -> Limits:
+    monthly = _float("MONTHLY_BUDGET_USD", 50.0)
+    return Limits(
+        monthly_budget_usd=monthly,
+        daily_budget_usd=_float("DAILY_BUDGET_USD", round(monthly / 15, 2)),
+        session_max_minutes=_int("SESSION_MAX_MINUTES", 10, minimum=1),
+        session_max_replies=_int("SESSION_MAX_REPLIES", 30, minimum=1),
+        visitor_calls_per_day=_int("VISITOR_CALLS_PER_DAY", 10),
+        persona_minutes_per_day=_int("PERSONA_MINUTES_PER_DAY", 120),
+        daily_max_minutes=_int("DAILY_MAX_MINUTES", 240),
+        monthly_max_minutes=_int("MONTHLY_MAX_MINUTES", 3000),
+        daily_max_llm_tokens=_int("DAILY_MAX_LLM_TOKENS", 2_000_000),
+        monthly_max_llm_tokens=_int("MONTHLY_MAX_LLM_TOKENS", 30_000_000),
+        daily_max_tts_chars=_int("DAILY_MAX_TTS_CHARS", 100_000),
+        monthly_max_tts_chars=_int("MONTHLY_MAX_TTS_CHARS", 1_000_000),
+        price_llm_input_per_mtok=_float("PRICE_LLM_INPUT_PER_MTOK", 2.5),
+        price_llm_output_per_mtok=_float("PRICE_LLM_OUTPUT_PER_MTOK", 10.0),
+        price_stt_per_minute=_float("PRICE_STT_PER_MINUTE", 0.0077),
+        price_tts_per_mchar=_float("PRICE_TTS_PER_MCHAR", 50.0),
+    )
+
+
 def _ice_servers() -> list[dict[str, Any]]:
     raw = os.getenv("ICE_SERVERS") or DEFAULT_ICE
     try:
@@ -258,6 +317,7 @@ class Settings:
     data_dir: Path = ROOT / "data"
     # Personas kept outside the repo (for example on a server volume); loaded alongside personas_dir.
     private_personas_dir: Path | None = None
+    limits: Limits = field(default_factory=Limits)
     cloud: CloudSettings | None = None  # None unless CLOUD_MODE=1; self-hosted servers never see the cloud pages
 
     @property
@@ -330,5 +390,6 @@ def load_settings() -> Settings:
         cloudflare_turn_key_id=cloudflare_key_id,
         cloudflare_turn_api_token=cloudflare_token,
         data_dir=data_dir,
+        limits=_limits(),
         cloud=_cloud_settings(),
     )
