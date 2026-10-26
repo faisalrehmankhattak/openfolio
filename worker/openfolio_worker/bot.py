@@ -8,6 +8,7 @@ The face is animated in the browser from the audio, so the server needs no GPU.
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import Any
 
 from loguru import logger
@@ -34,6 +35,7 @@ from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
 from .activity import ConversationActivity
+from .call_meter import CallClock, CallMeter
 from .cards import PortfolioCards
 from .config import Settings, llm_extra_params
 from .guard import VisitorGuard, ended
@@ -43,6 +45,7 @@ from .usage import UsageLedger
 from .voice_chunks import ClauseAggregator
 
 MAX_ANSWER_TOKENS = 300  # spoken answers are short; this also caps the cost of one reply
+USAGE_CHECK_SECONDS = 30  # how often a running call adds its time and checks the spending caps
 
 # Frames that reset Pipecat's idle timer. ConversationActivity double-checks before hanging up.
 IDLE_RESET_FRAMES = (
@@ -149,11 +152,12 @@ async def run_conversation(
         [
             transport.input(),
             make_stt(settings),
-            VisitorGuard(persona.first_name, session_id),
+            VisitorGuard(persona.first_name, session_id, max_turns=settings.limits.session_max_replies),
             PortfolioCards(persona),
             user_aggregator,
             make_llm(settings, persona),
             make_tts(settings, persona),
+            *([CallMeter(usage, persona.id, visitor)] if usage else []),
             transport.output(),
             assistant_aggregator,
         ]
@@ -211,8 +215,34 @@ async def run_conversation(
         logger.info(f"[{session_id}] visitor left")
         await runner.cancel()
 
-    try:
-        await asyncio.wait_for(runner.run(), timeout=persona.max_session_seconds)
-    except TimeoutError:
-        logger.info(f"[{session_id}] reached the {persona.max_session_seconds}s limit")
+    async def hang_up(reason: str) -> None:
+        await worker.queue_frames([ended(reason)])
+        await asyncio.sleep(0.5)  # let the message reach the browser before the connection closes
         await runner.cancel()
+
+    limit = min(persona.max_session_seconds, settings.limits.session_max_minutes * 60)
+    clock = CallClock(usage, persona.id, visitor) if usage else None
+
+    async def watchdog() -> None:
+        started = time.monotonic()
+        while (remaining := limit - (time.monotonic() - started)) > 0:
+            await asyncio.sleep(min(USAGE_CHECK_SECONDS, remaining))
+            if clock:
+                clock.flush()
+            if usage and (reason := usage.server_cap()):
+                logger.info(f"[{session_id}] ending the call: {reason}")
+                await hang_up("usage_limit")
+                return
+        logger.info(f"[{session_id}] reached the {limit}s limit")
+        await hang_up("time_limit")
+
+    guard_task = asyncio.create_task(watchdog())
+    try:
+        # The watchdog ends the call politely; this is only a backstop if that hangs.
+        await asyncio.wait_for(runner.run(), timeout=limit + 15)
+    except TimeoutError:
+        await runner.cancel()
+    finally:
+        guard_task.cancel()
+        if clock:
+            clock.flush()

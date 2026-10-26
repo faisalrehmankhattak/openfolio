@@ -79,10 +79,11 @@ def _is_user(message: Any) -> bool:
 class VisitorGuard(FrameProcessor):
     """Sits between speech-to-text and the conversation context."""
 
-    def __init__(self, persona_first_name: str, session_id: str, **kwargs: Any) -> None:
+    def __init__(self, persona_first_name: str, session_id: str, max_turns: int = MAX_TURNS, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self._name = persona_first_name
         self._session = session_id
+        self._max_turns = min(max_turns, MAX_TURNS)
         self._turns = 0
         self._last_typed = float("-inf")
         self.flagged = 0
@@ -136,7 +137,7 @@ class VisitorGuard(FrameProcessor):
                 if any(_is_user(m) for m in frame.messages):
                     self._turns += 1
 
-        if self._turns > MAX_TURNS:
+        if self._turns > self._max_turns:
             await self._end("turn_limit")
             return
 
