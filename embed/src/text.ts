@@ -47,6 +47,10 @@ export const isSeriousError = (raw: string, fatal: boolean): boolean =>
 
 /** Plain-language explanation of a failed connection attempt. */
 export function explainConnectError(raw: string): Notice {
+  if (/usage limit/i.test(raw))
+    return { title: "Taking a break", body: "This assistant has reached its usage limit. Please try again later." };
+  if (/call limit/i.test(raw))
+    return { title: "Daily limit reached", body: "You've used today's calls. Please come back tomorrow." };
   if (/\b503\b/.test(raw)) return { title: "All lines are busy", body: "Try again in a minute." };
   if (/\b429\b/.test(raw))
     return {

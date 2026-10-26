@@ -35,7 +35,7 @@ export type CardPayload =
   | { card: "contact"; data: { email: string | null; links: Link[]; booking_url: string | null } }
   | { card: "message_sent"; data: { name?: string } };
 
-export type EndReason = "idle" | "turn_limit" | "voice_command";
+export type EndReason = "idle" | "turn_limit" | "time_limit" | "usage_limit" | "voice_command";
 
 export type ServerMessage = ({ type: "openfolio.card" } & CardPayload) | { type: "openfolio.ended"; reason: EndReason };
 

@@ -30,6 +30,8 @@ const CONNECT_TIMEOUT_MS = 20_000;
 const END_HINTS: Record<EndReason | "", string> = {
   idle: "The call ended because it went quiet. Ask anything to start again.",
   turn_limit: "That's the end of this call. Start a new one anytime.",
+  time_limit: "This call reached its time limit. Start a new one anytime.",
+  usage_limit: "This assistant has reached its usage limit. Please try again later.",
   voice_command: "Call ended. Ask anything to start again.",
   "": "Call ended. Ask anything to start again.",
 };
@@ -584,7 +586,14 @@ export async function mount(root: ShadowRoot, opts: MountOptions): Promise<void>
   /** Also the server's admission check: busy, rate-limited and blocked calls are refused here, before WebRTC starts. */
   async function fetchIceServers(): Promise<RTCIceServer[]> {
     const res = await fetch(`${personaUrl}/ice-servers`);
-    if (!res.ok) throw new Error(`Connection settings refused (${res.status})`);
+    if (!res.ok) {
+      // The server explains limits in its detail text; keep it so the notice can say why.
+      const detail = await res
+        .json()
+        .then((b: { detail?: unknown }) => (typeof b.detail === "string" ? b.detail : ""))
+        .catch(() => "");
+      throw new Error(`Connection settings refused (${res.status}) ${detail}`.trim());
+    }
     return ((await res.json()) as { iceServers: RTCIceServer[] }).iceServers;
   }
 
