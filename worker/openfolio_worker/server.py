@@ -44,6 +44,7 @@ from .doctor import run_checks
 from .ice import IceProvider
 from .persona import Persona, load_persona_dirs
 from .registry import PREVIEW_SUFFIX, PersonaRegistry
+from .usage import UsageLedger
 
 if TYPE_CHECKING:
     from .cloud.routes import CloudService
@@ -129,6 +130,12 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
     handler = SmallWebRTCRequestHandler(ice_servers=[IceServer(**s) for s in settings.ice_servers] or None)
     ice = IceProvider(settings, transport)
     active: dict[str, asyncio.Task[None]] = {}
+    usage = UsageLedger(
+        settings.data_dir / "usage.db",
+        settings.limits,
+        paid_voice=settings.tts_provider == "elevenlabs",
+        metered_stt=settings.stt_provider == "deepgram",
+    )
     checks: dict[str, dict[str, Any]] = {}
     call_limit = RateLimiter(settings.calls_per_ip, RATE_WINDOW_SECONDS)
     ice_limit = RateLimiter(max(settings.calls_per_ip * 4, 1), RATE_WINDOW_SECONDS)
@@ -166,6 +173,14 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
         if len(active) >= settings.max_sessions:
             raise HTTPException(503, "All lines are busy. Try again in a minute.")
 
+    def visitor(request: Request) -> str | None:
+        # Local browser tests skip the per-visitor cap, like the rate limits; the spending caps still apply.
+        return None if is_local_test(request) else usage.visitor_key(ip(request))
+
+    def check_usage(request: Request, persona: Persona) -> None:
+        if refusal := usage.refusal(persona.id, visitor(request)):
+            raise HTTPException(refusal.status, refusal.message)
+
     def is_known_connection(pc_id: str | None) -> bool:
         # Pipecat has no public lookup; renegotiation must not count as a new call.
         return bool(pc_id) and pc_id in handler._pcs_map
@@ -189,6 +204,7 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
         await handler.close()  # type: ignore[no-untyped-call]
 
     app = FastAPI(title="Openfolio", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+    app.state.usage = usage
 
     # Cloud personas run on PUBLIC_URL, which is already in dev_origins.
     allowed = set(dev_origins) | registry.origins()
@@ -216,7 +232,13 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
     async def healthz() -> JSONResponse:
         problems = settings.check()
         ok = not problems and all(c["ok"] for c in checks.values())
-        body = {"ok": ok, "active_sessions": len(active), "config_problems": problems, "checks": checks}
+        body = {
+            "ok": ok,
+            "active_sessions": len(active),
+            "config_problems": problems,
+            "checks": checks,
+            "usage_limit": usage.server_cap(),  # a reason string while new calls are refused, else null
+        }
         return JSONResponse(body, status_code=200 if ok else 503)
 
     @app.get("/v1/personas/{persona_id}")
@@ -231,9 +253,11 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
 
     @app.get("/v1/personas/{persona_id}/ice-servers")
     async def ice_servers(persona_id: str, request: Request) -> JSONResponse:
-        check_origin(request, (await get_persona(request, persona_id))[0])
+        persona = (await get_persona(request, persona_id))[0]
+        check_origin(request, persona)
         # Fetched right before every call, so the widget can explain a refusal before WebRTC starts retrying.
         check_capacity()
+        check_usage(request, persona)
         if not is_local_test(request) and not ice_limit.allow(ip(request)):
             raise HTTPException(429, "Too many requests. Try again in a few minutes.")
         return JSONResponse({"iceServers": await ice.browser()}, headers={"Cache-Control": "no-store"})
@@ -246,17 +270,22 @@ def create_app(settings: Settings | None = None, *, transport: httpx.AsyncBaseTr
         # A call started by typing already carries a question; a greeting would race it.
         greet = request.query_params.get("greet") != "0"
 
+        caller = visitor(request)
         if not is_known_connection(body.pc_id):
             check_capacity()
+            check_usage(request, persona)
             if not is_local_test(request) and not call_limit.allow(ip(request)):
                 raise HTTPException(429, "Too many calls from this network. Try again in a few minutes.")
 
         async def on_connection(connection: SmallWebRTCConnection) -> None:
             session_id = uuid.uuid4().hex[:12]
+            usage.add_call(persona.id, caller)
 
             async def run() -> None:
                 try:
-                    await run_conversation(connection, persona, settings, session_id, greet=greet)
+                    await run_conversation(
+                        connection, persona, settings, session_id, greet=greet, usage=usage, visitor=caller
+                    )
                 except Exception:
                     logger.exception(f"[{session_id}] conversation failed")
                 finally:

@@ -52,9 +52,9 @@ SESSION_SECRET = "test-session-secret-" + "x" * 32
 
 
 @pytest.fixture
-def settings() -> Settings:
-    """A fully configured server that never reaches a provider."""
-    return replace(load_settings(), deepgram_api_key="x", llm_api_key="x", llm_model="m")
+def settings(tmp_path: Path) -> Settings:
+    """A fully configured server that never reaches a provider, with its own usage totals."""
+    return replace(load_settings(), deepgram_api_key="x", llm_api_key="x", llm_model="m", data_dir=tmp_path)
 
 
 @pytest.fixture

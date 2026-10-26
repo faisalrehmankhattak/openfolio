@@ -39,6 +39,7 @@ from .config import Settings, llm_extra_params
 from .guard import VisitorGuard, ended
 from .persona import Persona, build_system_prompt
 from .tools import SessionResources, leave_message
+from .usage import UsageLedger
 from .voice_chunks import ClauseAggregator
 
 MAX_ANSWER_TOKENS = 300  # spoken answers are short; this also caps the cost of one reply
@@ -128,7 +129,13 @@ def make_llm(s: Settings, persona: Persona) -> OpenAILLMService:
 
 
 async def run_conversation(
-    connection: SmallWebRTCConnection, persona: Persona, settings: Settings, session_id: str, greet: bool = True
+    connection: SmallWebRTCConnection,
+    persona: Persona,
+    settings: Settings,
+    session_id: str,
+    greet: bool = True,
+    usage: UsageLedger | None = None,
+    visitor: str | None = None,
 ) -> None:
     transport = SmallWebRTCTransport(
         webrtc_connection=connection,
