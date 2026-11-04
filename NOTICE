@@ -9,8 +9,6 @@ SHA-256 b06bd9df4d7d71d92774f895be31305cb8ff26f966f4c353beb82d3ccd94bea2.
 Copyright (c) 2023 Ready Player Me. MIT license: avatars/LICENSE-readyplayerme.txt.
 This covers the sample file only, not avatars made with the Ready Player Me service.
 avatars/demo-portrait.jpg is a render of that sample avatar.
-avatars/faisal-photo.jpg is a photo of Faisal Rehman, included for the demo persona only;
-it is not covered by the Apache license. Replace it with your own photo.
 
 Third-party packages are used under their own licenses, including
 Pipecat (BSD-2-Clause), TalkingHead and HeadAudio (MIT) and three.js (MIT).

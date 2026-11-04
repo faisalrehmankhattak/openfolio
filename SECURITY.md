@@ -6,8 +6,7 @@ Openfolio runs an AI that speaks for real people, so we take reports seriously a
 
 Please report vulnerabilities privately, never in a public issue, pull request or discussion.
 
-- Email **the maintainer through GitHub security advisories** with "Openfolio security" in the subject, or
-- open a private report through [GitHub security advisories](https://github.com/faisalrehmankhattak/openfolio/security/advisories/new).
+Open a private report through [GitHub security advisories](https://github.com/faisalrehmankhattak/openfolio/security/advisories/new).
 
 Include what you found, the steps to reproduce it, the impact you expect, and the commit or the Openfolio Cloud URL you tested. You'll get a reply within 3 working days. We'll keep you updated until it's fixed and credit you in the release notes unless you prefer otherwise.
 

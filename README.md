@@ -16,8 +16,6 @@
 
 **[Try it on Openfolio Cloud](https://YOUR-OPENFOLIO-CLOUD-URL)** · [Run it yourself](#quick-start) · [Contribute and earn credits](#contribute-and-earn-credits)
 
-<img src=".github/assets/cloud-landing.png" alt="Openfolio Cloud: 'Your portfolio, alive.' with a live AI demo persona you can talk to or chat with" width="820">
-
 </div>
 
 **Your portfolio, alive.** Openfolio is a modern portfolio for everyone: recruiters and visitors talk face to face with a 3D AI version of you, by voice or text, and it answers only from what you wrote. Add it to any site with one line of HTML, or share a link.
@@ -29,11 +27,6 @@
 It is an open-source **AI avatar widget for portfolio websites** and a self-hosted alternative to closed "AI digital twin" services. The face renders in the visitor's browser, so **the server needs no GPU** and you pay only for speech-to-text, the LLM and the voice (or nothing, with local models). **Openfolio Cloud** is the hosted version, in an invite-only beta.
 
 > Openfolio is not related to an earlier investing app that used the same name.
-
-<p align="center">
-<img src=".github/assets/panel.png" alt="Openfolio widget: a 3D avatar answering questions about the owner's work" width="300">
-<img src=".github/assets/chat.png" alt="Chat mode with a project card" width="300">
-</p>
 
 ## Who it's for
 
@@ -101,8 +94,6 @@ Add `"$schema": "../persona.schema.json"` to the file for autocompletion and val
 
 ## Embed options
 
-<img src=".github/assets/launcher.png" alt="Launcher: a photo blending into the AI avatar, with a greeting offering Talk or Chat" width="328">
-
 ```html
 <!-- Floating button -->
 <script src="https://YOUR-SERVER/embed/embed.js" data-persona="you" data-label="Talk to me" async></script>
@@ -168,7 +159,7 @@ Browser (your site)                          Openfolio server (CPU only)
 
 The injection screen is a regular expression, not a classifier, and the system prompt is the second layer. The labelled corpus in `worker/tests/test_guard_eval.py` measures both missed attacks and false alarms; add any miss you see in your logs.
 
-Found a vulnerability? Please report it privately as described in [SECURITY.md](SECURITY.md) (email or [GitHub security advisories](https://github.com/faisalrehmankhattak/openfolio/security/advisories/new)), not in a public issue.
+Found a vulnerability? Please report it privately as described in [SECURITY.md](SECURITY.md) (through [GitHub security advisories](https://github.com/faisalrehmankhattak/openfolio/security/advisories/new)), not in a public issue.
 
 ## Cost limits
 
