@@ -14,7 +14,9 @@
 ![Self-hosted](https://img.shields.io/badge/self--hosted-no_GPU-0b6a50)
 [![PRs welcome: earn Cloud credits](https://img.shields.io/badge/PRs_welcome-earn_Cloud_credits-128a6a)](CONTRIBUTING.md)
 
-**[Try it on Openfolio Cloud](https://YOUR-OPENFOLIO-CLOUD-URL)** · [Run it yourself](#quick-start) · [Contribute and earn credits](#contribute-and-earn-credits)
+**[Run it yourself](#quick-start)** · [Contribute and earn credits](#contribute-and-earn-credits)
+
+<img src=".github/assets/demo-panel.png" alt="Openfolio on a portfolio page: the 3D AI avatar of the fictional demo persona, Avery Quinn, opened from the corner button, with suggested questions and Talk to Avery" width="820">
 
 </div>
 
