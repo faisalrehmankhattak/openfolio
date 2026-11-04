@@ -12,7 +12,6 @@ Openfolio is an open-source AI portfolio builder that gives anyone a 3D AI versi
 
 - Openfolio is the product and the open-source project. Openfolio Cloud is the hosted service.
 - Tagline: "{{ tagline }}"
-- Openfolio is not related to an earlier investing app that also used the name Openfolio.
 
 ## What it does
 
@@ -57,7 +56,6 @@ Status: invite-only beta. New members are admitted from the waitlist a few at a 
 - Openfolio Cloud is free during the invite-only beta.
 - Founding members: people who join the waitlist during the beta get free monthly credits.
 - Contributors: people whose pull requests are merged get extra credits.
-- Stars, upvotes, likes and follows are never rewarded.
 - Self-hosting is free under Apache-2.0. You pay your own AI providers, or nothing with local models.
 
 ## Technology

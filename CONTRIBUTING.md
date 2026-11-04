@@ -8,7 +8,6 @@ When your pull request is merged, you earn extra **Openfolio Cloud credits**, on
 
 - Every merged pull request counts: code, tests, documentation or translations.
 - After the merge, the maintainer contacts you through GitHub to add the credits to your Cloud account.
-- We reward real work only. Stars, follows, upvotes and comments never earn credits or perks, and pull requests opened just to farm credits (for example, cosmetic churn) are closed.
 
 ## Good first issues
 

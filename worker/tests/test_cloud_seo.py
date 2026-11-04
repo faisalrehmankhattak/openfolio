@@ -133,14 +133,12 @@ def test_llms_full_txt_has_the_facts_and_every_faq(cloud_settings):
         "Apache-2.0",
         "invite-only beta",
         "free during the invite-only beta",
-        "never rewarded",
         "Always labelled AI",
     ):
         assert needle in text
     for item in seo.FAQ:
         assert f"### {item.question}" in text
         assert item.answer in text
-    assert "unrelated" in text or "not related" in text  # the older investing app with the same name
 
 
 def test_security_txt(cloud_settings, persona):
@@ -239,15 +237,13 @@ def test_private_and_utility_pages_are_noindex(cloud_settings):
     assert 'content="noindex, nofollow"' in missing
 
 
-def test_landing_copy_says_waitlist_and_never_rewards_stars(cloud_settings):
+def test_landing_copy_says_waitlist(cloud_settings):
     html = client_for(cloud_settings).get("/").text
     assert "Join the waitlist" in html
     assert "Request access" not in html
     assert "Star on GitHub" in html
     assert "Founding members" in html
-    lowered = html.lower()
-    assert "upvote" not in lowered.replace("stars, upvotes or follows", "")
-    assert "never earns credits" in lowered
+    assert "upvote" not in html.lower()
 
 
 def test_product_hunt_banner_is_off_by_default(cloud_settings):

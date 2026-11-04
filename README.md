@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="worker/openfolio_worker/cloud/static/wordmark-white.svg">
-  <img src="worker/openfolio_worker/cloud/static/wordmark.svg" alt="Openfolio" height="56">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/faisalrehmankhattak/openfolio/main/worker/openfolio_worker/cloud/static/wordmark-white.svg">
+  <img src="https://raw.githubusercontent.com/faisalrehmankhattak/openfolio/main/worker/openfolio_worker/cloud/static/wordmark.svg" alt="Openfolio" height="56">
 </picture>
 
 ### The open-source AI portfolio builder: a 3D AI version of you that talks to recruiters by voice or chat.
@@ -11,8 +11,8 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
-![Self-hosted](https://img.shields.io/badge/self--hosted-no%20GPU-0b6a50)
-[![PRs welcome: earn Cloud credits](https://img.shields.io/badge/PRs%20welcome-earn%20Cloud%20credits-128a6a)](CONTRIBUTING.md)
+![Self-hosted](https://img.shields.io/badge/self--hosted-no_GPU-0b6a50)
+[![PRs welcome: earn Cloud credits](https://img.shields.io/badge/PRs_welcome-earn_Cloud_credits-128a6a)](CONTRIBUTING.md)
 
 **[Try it on Openfolio Cloud](https://YOUR-OPENFOLIO-CLOUD-URL)** · [Run it yourself](#quick-start) · [Contribute and earn credits](#contribute-and-earn-credits)
 
@@ -25,8 +25,6 @@
 ```
 
 It is an open-source **AI avatar widget for portfolio websites** and a self-hosted alternative to closed "AI digital twin" services. The face renders in the visitor's browser, so **the server needs no GPU** and you pay only for speech-to-text, the LLM and the voice (or nothing, with local models). **Openfolio Cloud** is the hosted version, in an invite-only beta.
-
-> Openfolio is not related to an earlier investing app that used the same name.
 
 ## Who it's for
 
@@ -52,7 +50,6 @@ Openfolio is built in the open, and contributors get rewarded for real work:
 
 - **Merged pull requests earn Openfolio Cloud credits**, on top of the free monthly credits that founding members (everyone who joins the waitlist during the beta) receive. Code, tests, docs and translations all count.
 - Good places to start: [`good first issue`](https://github.com/faisalrehmankhattak/openfolio/labels/good%20first%20issue) labels, the prompt-injection corpus in `worker/tests/test_guard_eval.py`, and testing voice on browsers and networks we haven't covered.
-- Stars are always appreciated but never rewarded: no credits or perks for stars, follows or upvotes.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks and pull request rules, and our [Code of Conduct](CODE_OF_CONDUCT.md).
 
